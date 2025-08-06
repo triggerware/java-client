@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  in an ordinary java eclipse project, having this file as an immediate child of 'src' will cause it
+to be on the classpath -->
+<Configuration>
+  <Appenders>
+    <Console name="Console">
+      <!--  <PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"/> -->
+      <PatternLayout>
+		  <LevelPatternSelector defaultPattern="%d{HH:mm:ss.SSS} %-5level - %msg%n">
+		    <PatternMatch key="ERROR" pattern="%d{HH:mm:ss.SSS} %-5level - %throwable{short}%n"/>
+		  </LevelPatternSelector>      
+      </PatternLayout>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Root level="info">
+      <AppenderRef ref="Console"/>
+    </Root>
+  </Loggers>
+</Configuration>
+
+<!-- predefined logging levels
+ALL	    All levels including custom levels.
+DEBUG	Designates fine-grained informational events that are most useful to debug an application.
+INFO	Designates informational messages that highlight the progress of the application at coarse-grained level.
+WARN	Designates potentially harmful situations.
+ERROR	Designates error events that might still allow the application to continue running.
+FATAL	Designates very severe error events that will presumably lead the application to abort.
+OFF	    The highest possible rank and is intended to turn off logging.
+TRACE   Designates finer-grained informational events than the DEBUG.
+ -->
+ <!--  PatternLayout pattern elements - see https://logging.apache.org/log4j/2.x/manual/layouts.html#PatternLayout
+ 
+Conversion Pattern	  Description
+c{precision}
+logger{precision}	
+                     Outputs the name of the logger that published the logging event. 
+                     The logger conversion specifier can be optionally followed by precision specifier, 
+                     which consists of a decimal integer, or a pattern starting with a decimal integer.
+                     
+C{precision}         Outputs the fully qualified class name of the caller issuing the logging request. 
+class{precision}	 This conversion specifier can be optionally followed by precision specifier, that follows the same rules 
+                     as the logger name converter.
+                     
+d{pattern}           Outputs the date of the logging event. The date conversion specifier may be followed by a 
+date{pattern}        set of braces containing a date and time pattern string per SimpleDateFormat .
+
+ex{option}           Outputs the Throwable trace bound to the logging event, by default this will output the
+exception{option}    full trace as one would normally find with a call to Throwable.printStackTrace().
+throwable{option}
+
+l                    Outputs location information of the caller which generated the logging event.
+location             The location information depends on the JVM implementation but usually consists 
+                     of the fully qualified name of the calling method followed by the callers source 
+                     the file name and line number between parentheses.
+
+
+
+ -->
+ 
+ <!-- 
+ %throwable{short} outputs the first line of the Throwable.
+%throwable{short.className} outputs the name of the class where the exception occurred.
+
+%throwable{short.methodName} outputs the method name where the exception occurred.
+  -->

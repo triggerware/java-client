@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="ISO-8859-1">
+<title>Overview of the Triggerware Java Client</title>
+</head>
+<body>
+<p>The Triggerware Java Client Library provides classes for implementing Java clients of a 
+Triggerware Server &lt;link to triggerware server documentation goes here&gt;.  Throughout this api documentation, 
+as well as in some class and method names, the abbreviated text <b>TW</b> is used in place of the longer name <b>Triggerware</b>.
+</p><p> You are viewing the detailed JavaDoc documentation of this library. Documentation on use of the library, and examples
+of its use, can be found in &lt;link to Java TW Client Library usage documentation goes here&gt;
+</p><p>This library is loosely modeled on 
+<a href="https://docs.oracle.com/en/java/javase/13/docs/api/java.sql/module-summary.html">the Java JDBC api </a>
+It consists of a single package {@link calqlogic.twservercomms} This package contains several classes and methods with names 
+and functionality
+analogous to those found in JDBC's <a href="https://docs.oracle.com/en/java/javase/13/docs/api/java.sql/javax/sql/package-summary.html">java.sql</a> package.
+
+</p><p>In particular, the library contains classes that enable a client to</p>
+<ul>
+<li> create and close connections to a TW server </li>
+<li> make requests for services provided by a TW server and obtain the results of those requests </li>
+<li> handle notifications sent to the client by a TW server </li>
+</ul>
+
+<p> A Triggerware Server is not an sql database, though it does provide access to data using a tabular data model. The differences
+between Triggerware and a true sql server are too significant, however, 
+for the real JDBC API to be hooked up to a Triggerware Server via a custom driver,in the manner that JDBC is adapted to true 
+sql servers. 
+The version 1.0 Triggerware client has far more limited 
+ {@link calqlogic.twservercomms.QueryStatement Statement} objects than actual JDBC. These statements provide quite general
+ capabilities for <em>querying</em> the tabular data. However these statements cannot
+</p>
+<ul>
+<li> update the tabular data</li>
+<li> define new tables </li>
+<li> define or invoke new server-side procedures </li>
+<li> define new server-side functions for use in queries.</li>
+</ul>
+<p>These capabilities must be supplied by a comination of specific requests from the client to the server together with
+ client-independent configuration of the Triggerware Server &lt;link to triggerware server documentation goes here&gt;.
+
+</p><p>Like some relational database servers, a TW server allows a client to register for notification of  certain
+<em>changes</em> to the data known to the server.  A java client performs this registration through {@link calqlogic.twservercomms.Subscription Subscriptions}.
+
+</p><p>A Triggerware application will involve application-specific configuration of the TW server
+&lt;link to triggerware server documentation goes here&gt; Such configuration will involve informing the server of sources
+of tablular data of interest to the application and possibly adding new procedures to the server that can be invoked by clients.
+</p><p>
+Java  TW application clients that use this library will define a subclass of the class
+{@link calqlogic.twservercomms.TriggerwareClient TriggerwareClient}.  The subclass will provide some combination of </p>
+<ul>
+<li> application specific uses of the classes and methods in this library, </li>
+<li>  application specific logic to manipulate the data obtained from the TW server in responses to requests
+ and in notifiations.
+</ul>
+<p>
+In particular, a TW application Java client will use the methods of this library that make requests to the TW server containing
+ queries and triggering conditions for notifications.  The queries and triggering conditions
+ are expressed as strings in either of two supported notations</p>
+<ul>
+<li>SQL -- this notation uses the syntax of SQL queries with table names that refer to the tabular data known to the 
+configured TW server.
+ A slight extension to SQL syntax is provided to describe triggering conditions.  More detail on the SQL available to TW clients
+ can be found in &lt;link to TW SQL documentation goes here&gt;</li>
+<li>FOL -- this notation is based on the concepts of first order logic, using a syntax from the programming language Lisp.
+Details can be found in <a href="https://ap5.com/doc/ap5-man.html">the AP5 reference manual</a></li>
+</ul>
+
+
+</body>
+</html>
