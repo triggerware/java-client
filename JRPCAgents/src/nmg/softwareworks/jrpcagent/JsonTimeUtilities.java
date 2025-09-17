@@ -62,17 +62,7 @@ public class JsonTimeUtilities {
 	 * @return the java time represented by the serialization, or null if the serialization is not recognized as a time.
 	 */
 	public static LocalTime timeFromJson(String jst) {
-		return LocalTime.parse(jst);
-		/*LocalDateTime d = null;
-		try {
-			d = LocalDateTime.parse(jt,timeFormatFractional);
-		} catch (DateTimeParseException e) {
-			try {
-				d = LocalDateTime.parse(jt, timeFormat);
-			} catch (DateTimeParseException e1) {	}
-		}
-		return (d==null)? null : d.toLocalTime();*/
-	}
+		return LocalTime.parse(jst);	}
 
 	/*private static DateTimeFormatter timestampFormat =  DateTimeFormatter.ofPattern(
 			String.format("%s 'T' %s", dateFormatPattern, timeFormatPattern),  Locale.US);
@@ -121,12 +111,12 @@ public class JsonTimeUtilities {
 	}
 	
 	public interface CustomDeserializer{
-	    Object parse(JsonParser parser) throws IOException;}
+	    public Object parse(JsonParser parser) throws IOException;}
 	
 	private static final class JsonInstantDeserializer extends JsonDeserializer<Instant>{
 		@Override
 		public Instant deserialize(JsonParser parser, DeserializationContext arg1)
-				throws IOException {
+				throws IOException, JsonProcessingException {
 			var jts = parser.readValueAs(String.class);
 			return timestampFromJson(jts);
 		}
@@ -134,7 +124,7 @@ public class JsonTimeUtilities {
 	private static final class JsonInstantSerializer extends JsonSerializer<Instant>{
 		@Override
 		public void serialize(Instant instant, JsonGenerator gen, SerializerProvider provider)
-				throws IOException {
+				throws IOException, JsonProcessingException {
 			gen.writeString(asJson(instant));			
 		}
 	}

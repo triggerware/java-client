@@ -31,13 +31,13 @@ public class NamedRequestParameters extends HashMap<String, Object> {
 	}
 
 	public void validate(OutboundRequest<?> request, String[]requiredParameterNames, String[]optionalParameterNames) {
-				//throws ActualParameterException{
 		if (requiredParameterNames != null) {
 			for (String req :requiredParameterNames) {
 				if (!containsKey(req)) 
 					throw new JRPCRuntimeException.ActualParameterException(String.format("missing required parameter name %s", req));
 			}
 		}
+		if (optionalParameterNames == null) return;
 		outer:
 		for (String s : keySet()) {
 			if (requiredParameterNames != null)

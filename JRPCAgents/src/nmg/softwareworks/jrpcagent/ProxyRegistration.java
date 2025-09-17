@@ -21,7 +21,7 @@ final class ProxyRegistration extends Handler_Proxy_Registration{
 				throw new Exception("A JRPC request handler must be a static method or a method of a class that implements JRPCAgent");
 	}
 	
-	private final HashMap<String, RequestSignature> proxySignatures = new HashMap<>();
+	private HashMap<String, RequestSignature> proxySignatures = new HashMap<>();
 	public Map<String, RequestSignature> getProxySignatures(){return proxySignatures;}
 	public void clearProxySignatures() {
 		var sigs = getProxySignatures();
@@ -40,7 +40,7 @@ final class ProxyRegistration extends Handler_Proxy_Registration{
 	}
 	public RequestSignature getProxySignature(String methodName) { return getProxySignatures().get(methodName);}
 	
-	private final HashMap<String, Method> proxyMethods = new HashMap<>();
+	private HashMap<String, Method> proxyMethods = new HashMap<>();
 	public Map<String, Method> getProxyMethods(){return proxyMethods;}
 	public void clearProxyMethods() {getProxyMethods().clear();}
 	public Method registerProxyMethod(String methodName, Method m) throws Exception {

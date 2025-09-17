@@ -2,7 +2,8 @@ package nmg.softwareworks.jrpcagent;
 
 import java.io.IOException;
 import java.net.Socket;
-import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCObjectMapper;
+
+//import com.fasterxml.jackson.databind.json.JsonMapper;
 
 /**
  * A ServerAgent is a JRPCAgent created in response to a JRPC Server receiving a connection request on it listening port.
@@ -13,19 +14,27 @@ import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCObjectMapper;
  * <li>If a ServerAgent has no registered notification inducer for a method, it will use a notification inducer
  *  registered for the JRPCServer that spawned it.</li>
  * </ul>
+ * A subclass of this class should be used as the 'typical' kind of agent one obtains by connecting to a specific JRPC service over a socket connection.
+ * The subclass will register the request and notification handlers for the protocol.
+ * 
+ * This library does not have a corresponding clientAgent class.  It should.
+ * 
  */
-public class ServerAgent extends JRPCAgent{
+public abstract class ServerAgent extends JRPCAgent{
 	
 	private final JRPCServer server;
 	private final int index;
-	public ServerAgent(JRPCServer server, Socket socket) throws IOException{
-		super(socket);
+	/**
+	 * @param server The JRPCServer whose behavior this agent implements
+	 * @param socket The connection that identifies the partener agent of this ServerAgent
+	 * @param name A name for this agent. This can be null. The agent name may be assigned later with setName()
+	 * @throws IOException if a problem arises establishing the communications channels between the ServerAgent and its partner
+	 */
+	public ServerAgent(JRPCServer server, Socket socket, String name) throws IOException{
+		super(socket, name);
 		this.server = server;
 		this.index = server.nextConnectionIndex();
-		try{server.onNewNetworkClient(this);
-		}catch(Throwable t) {
-			Logging.log(t, "onNewNetworkClient failed");
-		}
+		server.onNewNetworkClient(this);
 	}
 	
 	/**
@@ -42,11 +51,12 @@ public class ServerAgent extends JRPCAgent{
 	/*private final ServerConnection connect(InputStream istream, OutputStream ostream) throws IOException {
 		return new ServerConnection(this, istream, ostream);}*/
 	
-	void close() {server.removeClient(this);}
-	
 	@Override
-	protected JRPCObjectMapper objectMapperForConnection(Connection c) {		
-		return super.objectMapperForConnection(c);}
+	public void close() {server.removeClient(this);}
+	
+	/*@Override
+	protected JsonMapper objectMapperForConnection(Connection c) {		
+		return c.getObjectMapper();}*/
 	
 	//If this agent does not have its own registration for a handler, see if the Server itself has one
 

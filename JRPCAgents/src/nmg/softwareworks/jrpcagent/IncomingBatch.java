@@ -9,8 +9,7 @@ public class IncomingBatch extends BatchMessage implements IncomingJRPCMessage{
 	//elements of messages may be a combination or requests and notifications
 
 	IncomingBatch(Connection conn) {
-		this.conn = conn;
-	}
+		this.conn = conn;	}
 
 	@Override
 	public Connection getConnection() {return conn;}
@@ -26,5 +25,11 @@ public class IncomingBatch extends BatchMessage implements IncomingJRPCMessage{
 	@Override
 	public boolean isBatch() {
 		return true;}
+	
+    static IncomingBatch parseOneBatchMessage(Connection conn) {
+		var batch = new IncomingBatch(conn);
+		//TODO: parse individual requests/notifications and add them to batch
+		return batch;
+	}
   
 }

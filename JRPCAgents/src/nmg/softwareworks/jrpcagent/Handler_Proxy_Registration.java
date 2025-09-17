@@ -4,7 +4,7 @@ package nmg.softwareworks.jrpcagent;
 
 public class Handler_Proxy_Registration {
 	protected static boolean publicOnlyReflection = true;
-	static{
+	/*static{
 		var sm = System.getSecurityManager();
 		if (sm == null) publicOnlyReflection = false;
 		else try{
@@ -12,5 +12,5 @@ public class Handler_Proxy_Registration {
 				publicOnlyReflection = false;
 			}catch(Exception e) {
 			}
-		}
+		}*/
 }

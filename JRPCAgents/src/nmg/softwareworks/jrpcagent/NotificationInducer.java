@@ -11,9 +11,10 @@ package nmg.softwareworks.jrpcagent;
  */
 public interface NotificationInducer {
 	/**
-	 * @return the jackson 'type' (a class, a JavaType, or a TypeReference) to use for deserializing notifications for this
+	 * @return the jackson 'type' (a class, or a JavaType) to use for deserializing notifications for this
 	 * inducer.  This must designate a type that inherits from Notification&lt;T&gt;
 	 */
-    Object getNotificationType();
-	default boolean isClosed() {return false;}
+	Object getNotificationType();
+	//default boolean isClosed() {return false;}
+	void establishDeserializationAttributes(SerializationState ss);
 }

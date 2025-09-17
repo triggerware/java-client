@@ -18,11 +18,13 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 		final Method method;
 		final Object instance;
 		final boolean synchronous;
+		//final boolean useVirtualThread;
 		//final String resultSerializationContext;
-		RegisteredHandler(Method method, boolean synchronous, Object instance){
+		RegisteredHandler(Method method, boolean synchronous, /*boolean useVirtualThread,*/ Object instance){
 			this.method = method;
 			this.instance = instance;
 			this.synchronous = synchronous;
+			//useVirtualThread = useVirtualThread;
 			//this.resultSerializationContext = resultSerializationContext;
 		}
 	}
@@ -75,7 +77,7 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 	protected Map<String, RegisteredHandler> requestHandlers = new HashMap<>();
 	public  Map<String, RegisteredHandler> getRequestHandlers(){return requestHandlers;}
 	//public void clearRequestHandlers() {getRequestHandlers().clear();}
-	public  RegisteredHandler registerRequestHandler(String methodName, Method m, boolean synchronous, Object instance) throws Exception {
+	private  RegisteredHandler registerRequestHandler(String methodName, Method m, boolean synchronous,  Object instance) throws Exception {
 		validateRequestHandlerMethod(m);
 		if (methodName.isBlank()) methodName = m.getName();
 		if (Modifier.isStatic(m.getModifiers()))
@@ -86,32 +88,13 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 		return getRequestHandlers().put(methodName, rh);}
 	public  RegisteredHandler getRequestHandler(String method) { return getRequestHandlers().get(method);}
 	
-	public  void registerRequestHandler(String methodName, RequestSignature sig, Method m, boolean synchronous,
+	public void registerRequestHandler(String methodName, RequestSignature sig, Method m, boolean synchronous, boolean useVirtualThread, //ignored, not using virutal threads
 			Object instance, String resultSerializationContext) throws Exception {
 		if (methodName == null || methodName.isEmpty())
 			throw new Exception(String.format("registerRequestHandler: invalid method name [%s]",methodName));
 		registerRequestHandler(methodName, m, synchronous, instance);
 		registerRequestSignature(methodName, sig);
 	}
-	
-
-	/* notifications are now handled by notificationInducers
-	 protected final Map<String, RequestSignature> notificationSignatures = new HashMap<String, RequestSignature> ();
-	
-	Map<String, RequestSignature> getNotificationSignatures() {return notificationSignatures;}
-	public void clearNotificationSignatures() {
-		var sigs = getNotificationSignatures();
-		if (sigs != null) sigs.clear();}
-	public RequestSignature registerNotificationSignature(String methodName,  RequestSignature sig) {
-		return getNotificationSignatures().put(methodName, sig);}
-	public RequestSignature registerNotificationSignature(String methodName, Method m, boolean positional, 
-			String[]parameterNames)	{
-		if (methodName.isBlank()) methodName = m.getName();
-		//validateNotificationHandlerMethod(m);
-		RequestSignature sig =  positional ? new PositionalRequestSignature(m,  parameterNames)
-										   : new JsonObjectRequestSignature(m,  parameterNames);
-		return registerNotificationSignature(methodName, sig);
-	}*/
 	
 	protected final Map<String, NotificationInducer> notificationInducers = new HashMap<>();
 	Map<String, NotificationInducer> getNotificationInducers(){
@@ -127,13 +110,12 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 	/**
 	 * register all handlers specified by annotation in the class of this JRPCAgent or any of its superclasses.
 	 */
-	//public void registerHandlers() {registerHandlers(getClass());}
 	
 	public void registerHandlerFromAnnotation(JsonRpcHandler ann, Method method, Object instance) {
 		try {
 			var mName = ann.methodName();
 			//var sc = ann.resultSerializationContext();
-			registerRequestHandler(mName,  method, ann.synchronous(),  instance);
+			registerRequestHandler(mName,  method, ann.synchronous(), instance);
 			var pnames = ann.parameterNames();
 			if (pnames!=null && pnames.length==0) pnames = null;
 			var positional = ann.positionalParameters() && pnames == null;

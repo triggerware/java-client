@@ -1,12 +1,12 @@
 package nmg.softwareworks.jrpcagent;
 
+//import static nmg.softwareworks.jrpcagent.JsonUtilities.jsonMapper;
+
 import java.io.IOException;
 import java.util.Map;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.TreeNode;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
-import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCGenerator;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 /**
  * represents a single outgoing request or notification
@@ -14,74 +14,75 @@ import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCGenerator;
  */
 public class JRPCSimpleRequest<T> {
 	interface SupplierWithException<T> {
-		T get() throws IOException;
+		abstract T get() throws IOException;
 	}
 	//protected final ObjectNode request;
 	//private String preserialized = null;
 	protected JRPCResponse<T> response = null;
 	//two of the next three will be null
 	protected final Class<T> resultClass;
-	protected final TypeReference<T> resultTypeRef;
+	//protected final TypeReference<T> resultTypeRef;
 	protected final JavaType resultJType;
 	protected final String methodName;
 	protected final Object[] parameters;
 	protected final NamedRequestParameters namedParameters;
-	//protected final boolean serverAsynchronous;
-	protected final Map<String,TreeNode> meta;
-	protected final T instanceForResult;
+	//meta contains non-standard attribute:value pairs to include in the request message
+	//protected final Map<String,TreeNode> meta;
+	//protected final T instanceForResult;
 	private final boolean isNotification;
 	private final OutboundRequest<T> outbound;
 	int requestId = -1; //for normal requests, this field is assigned in postRequest
-	//public static boolean preSerializeRequests = false; //experimental, probably of no value
 
 	/*public JRPCSimpleRequest(OutboundRequest<T> outbound, JRPCAgent agent, String methodName, T instanceForResult, 
 			Object resultType, Object parameters) {
 		this(outbound, agent, null, methodName, instanceForResult, resultType, parameters);}*/
-	
 	@SuppressWarnings("unchecked")
-	JRPCSimpleRequest(OutboundRequest<T> outbound, JRPCAgent agent, Map<String, TreeNode> meta, String methodName, T instanceForResult, 
-			Object resultType, Object parameters){
-		this.meta = meta;
+	private JRPCSimpleRequest(OutboundRequest<T> outbound, String methodName, Object resultType, Object parameters) {
+		//this.meta = meta;
 		this.outbound = outbound;
+		this.methodName = methodName;
 		if (resultType ==  null) {//a notification
 			resultClass = null;
 			resultJType = null;
-			resultTypeRef = null;
+			//resultTypeRef = null;
 			isNotification = true;
-		} else if (resultType instanceof TypeReference) {
+		} /*else if (resultType instanceof TypeReference) {
 			resultClass = null;
 			resultJType = null;
 			resultTypeRef = (TypeReference<T>)resultType;
 			isNotification = false;
-		} else if (resultType instanceof JavaType) {
+		} */ else if (resultType instanceof JavaType jrt) {
 			resultClass = null;
-			resultJType = (JavaType)resultType;
-			resultTypeRef = null;
+			resultJType = jrt;
+			//resultTypeRef = null;
 			isNotification = false;			
 		} else {
 			resultClass = (Class<T>) resultType;
 			resultJType = null;
-			resultTypeRef = null;
+			//resultTypeRef = null;
 			isNotification = false;
 		}
-		this.methodName = methodName;
-		if (parameters instanceof NamedRequestParameters) {
+		if (parameters instanceof NamedRequestParameters nrp) {
 			this.parameters = null;
-			this.namedParameters = (NamedRequestParameters) parameters;
+			this.namedParameters = nrp;
 		} else {
-			this.parameters = (Object[]) parameters;
-            this.namedParameters = null;
+			this.parameters = (Object[]) parameters;;
+			this.namedParameters = null;
 		}
-		this.instanceForResult = instanceForResult;
+		//this.instanceForResult = null;//instanceForResult;
 
-		/*if (preSerializeRequests)
-			this.request = (namedParameters!=null) ? bareRequestN(agent, methodName, namedParameters)
-												: bareRequestP(agent, methodName, parameters);
-		else this.request = null;
-		if (request!=null)
-			request.put("asynchronous", serverAsynchronous);*/
 	}
 
+	JRPCSimpleRequest(OutboundRequest<T> outbound, //JRPCAgent agent, Map<String, TreeNode> meta, String methodName,Object resultType, 
+			  			Object parameters){
+		this(outbound, outbound.methodName, outbound.getResultType(),  parameters);
+	}
+	JRPCSimpleRequest(boolean clientAsynchronous, //Map<String, TreeNode> meta,
+			Object resultType,  String methodName, Object parameters){
+		this(null, methodName, resultType, parameters);
+	}
+
+	
 	boolean isNotification() {return isNotification;}
 	public String getMethodName() {return methodName;}
 	public Object[] getParameters() {return parameters;}
@@ -91,6 +92,7 @@ public class JRPCSimpleRequest<T> {
 	public Class<T> getResultClass(){return resultClass;}
 	//public boolean isServerAsynchronous() {return serverAsynchronous;}
 	boolean isCancelled() {return false;}
+	//OutboundRequest<T> getOutbound(){return outbound;}
 
 	int submit(Connection conn) throws IOException {
 		//tw server log is in  /home/tw/logs/jsonrpc.log
@@ -98,7 +100,7 @@ public class JRPCSimpleRequest<T> {
 		//int requestId = -1;
 		if (!isNotification) {
 			requestId = agent.nextRequestId();
-			if (outbound != null) outbound.requestId = requestId;
+			//if (outbound != null) outbound.requestId = requestId;
 			conn.addPendingRequest(requestId,this);
 		}
 		/*if (request != null) {
@@ -109,66 +111,74 @@ public class JRPCSimpleRequest<T> {
 				conn.writeSocket(json);
 			}
 		} else {//stream request*/
-			var text = streamRequest(conn, requestId);
-			if (text != null) Logging.log("%s requesting: <%s>", agent.getName(), text);
+			var jg = conn.getGenerator();
+			synchronized(jg) {
+				conn.startLogging(true);
+				streamRequest(jg, conn.getPartnerMapper());//, requestId);
+				jg.flush();
+				var text = conn.getLoggedText(true);
+				if (text != null) Logging.log("%s requesting: <%s>", agent.getName(), text);
+				conn.afterWriteMessage(); jg.flush();
+			}
 		//}
 		return requestId;
 	}
 	
-	public void notify(Connection conn)throws IOException {
-		var agent = conn.getAgent();
+	/*void notify(Connection conn)throws IOException {
 	    var text = streamNotification(conn);
-		if (text != null) Logging.log("%s notifying: <%s>", agent.getName(), text);		
-	}
-	
-	// write the portions of a message that are common to requests and notifications
-	void streamRequestOrNotification(JRPCGenerator jrpcGen) throws IOException {
-		jrpcGen.addStandardJRPCProperties( getMethodName());
-		jrpcGen.streamMeta(meta);
-		var jg = jrpcGen.getGenerator();
-		//synchronized(jg) {
-			jg.writeFieldName("params");
-			if (isPositional()){
-				jg.writeStartArray();
-				for (var param : getParameters()) 
-					jrpcGen.getMapper().writeValue(jg /*objMapper.getGenerator()*/, param);
-				jg.writeEndArray();
-			} else {
-				jg.writeStartObject();
-				for (var param : getNamedParameters().entrySet()) {
-					jrpcGen.streamAttributeValue(param.getKey(), param.getValue());	}
-				jg.writeEndObject();			
-			}
-		//}
-	}
-	private String streamNotification(Connection conn) throws IOException {
-		JRPCGenerator jrpcGen = conn.getGenerator();
-		var jg = jrpcGen.getGenerator();
-		synchronized(jg) {
-			jrpcGen.startLogging();
-			//var jg = objMapper.getGenerator();
-			jg.writeStartObject();
-			streamRequestOrNotification(jrpcGen);
-			jg.writeEndObject();
-			jg.flush();
-			return jrpcGen.logEntryComplete();
-	 }		
+		if (text != null) Logging.log("%s notifying: <%s>", conn.getAgent().getName(), text);		
+	}*/
+	void streamAttributeValue(JsonGenerator toPartner, JsonMapper mapper, String attribute, Object value) throws IOException  {
+		toPartner.writeFieldName(attribute);
+		mapper.writeValue(toPartner, value);
 	}
 
-	private String streamRequest(Connection conn, int id) throws IOException {
-		JRPCGenerator jrpcGen = conn.getGenerator();
-		var jg = jrpcGen.getGenerator();
-		synchronized(jg) {
-			jrpcGen.startLogging();
-			//var jg = objMapper.getGenerator();
+
+	/*private void streamMeta(JsonGenerator toPartner, JsonMapper mapper, Map<String, TreeNode> meta) throws IOException {
+		if (meta!=null) {
+			for (var pair: meta.entrySet())
+				streamAttributeValue(toPartner, mapper, pair.getKey(),  pair.getValue());
+		}
+	}*/
+	/* write the portions of a message that are common to requests and notifications
+	   this code does not use signatures! It assumes that the java type of the value to be serialized
+	   is sufficient to determine the serialization
+	   This is only called from a context that is synchronized on the JsonGenerator writing the data
+	 */
+	void streamRequestOrNotification(JsonGenerator jg, JsonMapper mapper) throws IOException {
+		JsonUtilities.addStandardJRPCProperties(jg, getMethodName());
+		//streamMeta(jg, mapper, meta);
+		jg.writeFieldName("params");
+		if (isPositional()){
+			jg.writeStartArray();
+			for (var param : getParameters()) 
+				mapper.writeValue(jg, param);
+			jg.writeEndArray();
+		} else {
 			jg.writeStartObject();
-			jg.writeNumberField("id", id);
-			streamRequestOrNotification(jrpcGen);
-			//jg.writeBooleanField("asynchronous", isServerAsynchronous());
-			jg.writeEndObject();
-			jg.flush();
-			return jrpcGen.logEntryComplete();
-	 }
+			for (var param : getNamedParameters().entrySet()) {
+				streamAttributeValue(jg, mapper, param.getKey(), param.getValue());	}
+			jg.writeEndObject();			
+		}
+	}
+	void streamNotification(JsonGenerator jg, JsonMapper mapper) throws IOException {
+		jg.writeStartObject();
+		streamRequestOrNotification(jg, mapper);
+		jg.writeEndObject();
+	}
+	
+	public void streamBatchRequestMember(JsonGenerator jg, JsonMapper mapper /*, int id*/) throws IOException {
+		jg.writeStartObject();
+		jg.writeNumberField("id", requestId);
+		streamRequestOrNotification(jg, mapper);
+		jg.writeEndObject();
+	}
+
+	private void streamRequest(JsonGenerator jg, JsonMapper mapper/*, int id*/) throws IOException {
+		jg.writeStartObject();
+		jg.writeNumberField("id", requestId);
+		streamRequestOrNotification(jg, mapper);
+		jg.writeEndObject();
 	}
 
 	public T handleSuccessResponse() {
@@ -187,40 +197,32 @@ public class JRPCSimpleRequest<T> {
 		this.notify(); //wake up thread, if any, waiting for responses
 	}
 	
-	/*private static Object javaFromJson(Class<?>target, JsonNode jn) {
-		if (target.isInstance(jn))	return jn;
-		if (target == String.class && jn.isTextual()) return jn.asText();
-		if ((jn.isValueNode()) != (target.isPrimitive())) 
-			throw new JRPCRuntimeException(String.format("return type mismatch:expected %s received %s", target, jn));
-		var jv = deserialize(jn,target);
-		if (jv == null)
-			throw new JRPCRuntimeException(String.format("unable to deserialize <%s> as an instance of %s",jn, target));
-		else return jv;
-	}*/
-	
-	/*public void preSerialize() {preserialized =  request.toString();}*/
-	
-	//private String getRequestJsonText() {	return preserialized == null ? request.toString() : preserialized;	}
-	
-	public Object deserializeResult(JsonParser jParser, Connection conn) {
-		Object restoration = null;
-		var agent = conn.getAgent();
-		var mapper = conn.getObjectMapper();
+	public Object deserializeResult(IncomingMessage response, JsonParser jParser, Connection conn) {
+		//this is the orginal request
+		//response is the message being deserialized.
+		
+		var dsstate = conn.getDeserializationState();
+		//dsstate.put("request", outbound);
 		try {
-			restoration = agent.prepareDeserializationState(mapper, meta);
 			if (resultClass != null)
-				return JRPCStreamParser.deserializeResult(jParser, resultClass, instanceForResult);
-			if (resultTypeRef != null) return jParser.readValueAs(resultTypeRef);
+				return conn.deserializeResult(jParser, resultClass);
+			//if (resultTypeRef != null) return jParser.readValueAs(resultTypeRef);
 			// parse with a JavaType target			
-			return conn.getObjectMapper().readValue(jParser, resultJType);
+			else {
+				//var xxx = jParser.readValueAsTree();
+				return conn.getPartnerMapper().readValue(jParser, resultJType);
+			}
 			
-		}catch(IOException e) {			
-			throw new JRPCRuntimeException.DeserializationFailure("could not deserialize the result in a response",e);
-		} finally {
-			agent.restoreDeserializationState(mapper, restoration);
-		}
+		}catch(IOException e) {		
+			var consumed = conn.getLoggedText(false);
+			throw new JRPCRuntimeException.DeserializationFailure(
+					String.format("could not deserialize the result in a response.<%s>", consumed), e);
+		} 
 	}
 
+	void establishResponseDeserializationAttributes(IncomingMessage response, DeserializationContext deserializationContext) {
+		if (outbound != null) outbound.establishResponseDeserializationAttributes(this, response, deserializationContext);	}
+	
 	/*private static final JsonNodeFactory jnfactory = JsonNodeFactory.instance;
 	private static final MappingJsonFactory mjfactory = new MappingJsonFactory();
 	private static ObjectMapper noStreamObjectMapper = new ObjectMapper(mjfactory);

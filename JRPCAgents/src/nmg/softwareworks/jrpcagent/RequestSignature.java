@@ -18,8 +18,9 @@ public abstract class RequestSignature {
 	}*/
 
 	static void logInterfaceWarning(Type t,  Method m) {
-		if (!(t instanceof Class<?> cls)) return;
-        if (cls.isInterface())
+		if (!(t instanceof Class<?>)) return;
+		var cls = (Class<?>)t;
+		if (cls.isInterface())
 		  Logging.log("using interface type <%s> for serialization in handler for %s", cls.getName(), m.getName());}
 
 	/*public static RequestSignature signatureFromMethod(Method m, boolean positional, String[]parameterNames) {		
@@ -71,13 +72,13 @@ public abstract class RequestSignature {
 	}
 	public RequestSignature(Object resultType, Class<?>[] exceptionTypes){
 		this.exceptionTypes = exceptionTypes;
-		if (resultType instanceof TypeReference) {
+		if (resultType instanceof TypeReference tr) {
 			resultClass = null;
 			resultJType = null;
-			resultTypeRef = (TypeReference<?>)resultType;
-		} else if (resultType instanceof JavaType) {
+			resultTypeRef = tr;
+		} else if (resultType instanceof JavaType jt) {
 			resultClass = null;
-			resultJType = (JavaType)resultType;
+			resultJType = jt;
 			resultTypeRef = null;			
 		} else {
 			assert resultType instanceof Class<?>;

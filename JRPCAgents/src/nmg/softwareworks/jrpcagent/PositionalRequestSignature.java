@@ -20,7 +20,7 @@ class PositionalRequestSignature extends RequestSignature {
 	PositionalRequestSignature(Method m, String[]parameterNames){
 		this(m, parameterNames, TypeFactory.defaultInstance());}
 
-    PositionalRequestSignature(Method m, String[]parameterNames, TypeFactory tf){
+	PositionalRequestSignature(Method m, String[]parameterNames, TypeFactory tf){
 		super(tf.constructType(m.getAnnotatedReturnType().getType()), m.getExceptionTypes());
 		logInterfaceWarning(m.getReturnType(), m);
 		var types = new Object[m.getParameterCount()-1];

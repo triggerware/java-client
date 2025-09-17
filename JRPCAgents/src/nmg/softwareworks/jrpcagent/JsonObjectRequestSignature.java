@@ -62,10 +62,10 @@ public class JsonObjectRequestSignature extends RequestSignature {
 		defaultActualParameters = getDefaultActuals();
 	}
 	private static boolean isPrimitive(Object type) {
-		return type instanceof SimpleType && ((SimpleType) type).isPrimitive();}
+		return type instanceof SimpleType st && st.isPrimitive();}
 	
 	private static Object defaultValueFor(Class<?> type) {//TODO: fix this;
-		if (type == int.class) return 0;
+		if (type == int.class) return (int)0;
 		if (type == long.class) return 0L;
 		if (type == short.class) return 0;
 		if (type == float.class) return 0.0f;

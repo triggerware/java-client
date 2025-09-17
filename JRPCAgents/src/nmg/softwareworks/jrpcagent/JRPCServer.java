@@ -2,7 +2,7 @@ package nmg.softwareworks.jrpcagent;
 
 import java.io.*;
 import java.net.ServerSocket;
-import java.net.Socket;
+//import java.net.Socket;
 import java.net.SocketException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,26 +44,27 @@ public abstract class JRPCServer extends HandlerRegistration {
 	 * @return a new ServerAgent instance
 	 * @throws IOException 
 	 */
-	public ServerAgent createServerAgent(Socket socket) throws IOException {
-		return new ServerAgent(this,socket);}
+	/*public ServerAgent createServerAgent(Socket socket) throws IOException {
+		return new ServerAgent(this,socket);}*/
 	
 	/**
 	 * Override onNewNetworkClient to execute your own event handler when a new connection is made to this server.
 	 */
 	public void onNewNetworkClient(ServerAgent agent) {}
-	private final Lock acceptLock = new ReentrantLock();
+	private Lock acceptLock = new ReentrantLock();
 	public void blockFurtherConnections(boolean b) {
 		if (b) acceptLock.lock(); else acceptLock.unlock();
-	}
-
-    public Thread start(boolean asDeamon) throws IOException {
-		Thread thread = new Thread() {
+	};
+	
+	public Thread start(boolean asDeamon, ServerAgent agent) throws IOException {
+		var thread = new Thread() {//this should be a virtual thread for java21+
 			public void run() {
 					while (true) {
-						Socket socket = null;
+						//Socket socket = null;
 						synchronized (acceptLock) {
 							try {
-								socket = serverSocket.accept();
+								//socket = 
+								serverSocket.accept();
 							}catch(SocketException ie) {
 								return;
 							}catch (IOException e) {
@@ -72,7 +73,7 @@ public abstract class JRPCServer extends HandlerRegistration {
 							}
 						}
 						try {
-							myClients.add(createServerAgent(socket));
+							myClients.add(agent);
 						}catch (Throwable t) {
 							Logging.log(t, String.format("JRPCServer <%s>failed to create a new ServerAgent", name));
 						}
@@ -90,12 +91,12 @@ public abstract class JRPCServer extends HandlerRegistration {
 	 */
 	protected void quitListening() {
 		try{serverSocket.close();
-		}catch(IOException e) {}
-    }
+		}catch(IOException e) {};
+	}
 	
 	/**
 	 * performs a shutdown of each of the existing clients of this JRPCServer
 	 */
 	protected void shutdownAllClients() {
-		myClients.forEach((sa -> {sa.shutdown();}));}
+		myClients.forEach((sa -> {sa.close();}));}
 }

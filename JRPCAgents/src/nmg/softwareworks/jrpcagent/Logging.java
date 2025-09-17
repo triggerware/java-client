@@ -61,9 +61,9 @@ public class Logging {
     	else System.clearProperty("log4j.configurationFile");
     	return logger;
     }*/
-	private static final ILogger emptyLogger = new ILogger() {};
+	private static ILogger emptyLogger = new ILogger() {};
 	private static ILogger logger = emptyLogger;
-	static void log(String event){ logger.log(event);}
+	public static void log(String event){ logger.log(event);}
 	public static void log(Throwable t, String event){logger.log(t, event);}
 	public static void log(String format, Object... args) {logger.log(format, args);}
 	
@@ -87,17 +87,5 @@ public class Logging {
 		return previous;
 	}
 
-	/*private static Object parseTest(String json, Class<?>classz) throws JsonParseException, IOException {
-		MappingJsonFactory jfactory = new MappingJsonFactory();
-		JsonParser jParser = jfactory.createParser(json);
-		return jParser.readValueAs(classz);
-		
-	}*/
-	static void main(String[] args) throws Exception {
-		//String f = locateFile(args[0]);
-		//configureLogging (new File(f));
-		log("a simple message");
-		log(null,new Exception("this is bad"));
-    }
 }
 

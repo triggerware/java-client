@@ -25,18 +25,18 @@ public abstract class JRPCException extends Exception implements JRPCProblem{
 	private final int code;
 	public static JRPCException fromError(JRPCSimpleRequest<?> req, ObjectNode error) {
 		int code = error.get("code").asInt();
-		switch (code) {
+		return switch (code) {
 			case invalidParamsCode:
-				return new InvalidParameters(req, error);
+				yield new InvalidParameters(req, error);
 			case methodNotFoundCode:
-				return new UnknownMethod(req, error);
+				yield new UnknownMethod(req, error);
 			case invalidRequestCode:
-				return new InvalidRequest(req, error);
+				yield new InvalidRequest(req, error);
 			case parseErrorCode:
-				return new ParseError(req, error);
+				yield new ParseError(req, error);
 			default:
-				return new JRPCApplicationError(error);
-		}		
+				yield new JRPCApplicationError(error);
+		};
 	}
 	private JRPCException(ObjectNode error) {
 		super(error.get("message").asText());
@@ -167,6 +167,19 @@ public abstract class JRPCException extends Exception implements JRPCProblem{
 		 * @return the JRPCRequest that received this error response
 		 */
 		public JRPCSimpleRequest<?> getRequest() {return req;}
+	}
+	
+	/**
+	 * a JRPCRequestTimeoutException is thrown when an agent abandons an asynchronous request.
+	 *
+	 */
+	public static class JRPCRequestTimeoutException extends JRPCException{
+		private final OutboundRequest<?> request;
+		public JRPCRequestTimeoutException(OutboundRequest<?> request) {
+			super("agent quit waiting for a response to an asynchronous request");
+			this.request = request;
+		}
+		public OutboundRequest<?> getRequest(){return request;}
 	}
 
 	/**

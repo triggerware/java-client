@@ -12,9 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
-import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCObjectMapper;
+//import nmg.softwareworks.jrpcagent.JRPCObjectMapper;
 
 
 /**
@@ -30,7 +31,7 @@ import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCObjectMapper;
  *</p><p>
  *Communication management includes dispatching incoming <em>requests/notifications</em> to the appropriate handler registered with the JRPCAgent
  *and dispatching <em>requests</em> to the partner. 
- * JRPCAgent contains methods for sending requests (execute, executeAsynch) and notifications (notify, notifyAsynch)
+ * JRPCAgent contains methods for sending requests (execute, executeAsynch) and notifications (notify)
  * to its partner. 
  * A request may be sent synchronously, in which case the sending thread blocks until the response is received.
  * A request may be sent asynchronously, in which case the caller receives a java CompletableFuture for dealing with
@@ -55,16 +56,28 @@ import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCObjectMapper;
  *</p><p>
  *An agent may be created by either supplying a pair of streams to give it an initial partner or by supplying a connected
  *Socket from which the stream pair may be found.
+ *</p><p>
+ *An agent may be released by executing its close method.  This closes its connection(s) with its partners.
  *</p>
  */
-public abstract class JRPCAgent extends HandlerRegistration{
+public abstract class JRPCAgent extends HandlerRegistration implements Closeable{
+	
+	final ExecutorService executorService = Executors.newFixedThreadPool(10);
+	protected final InputStream istream;
+	protected final OutputStream ostream;
+	public InputStream getInputStream() {return istream;}
+	public OutputStream getOutputStream() {return ostream;}
+	private final Set<String>outboundMetaPropertyNames = new HashSet<String>(),
+			                 inboundMetaPropertyNames = new HashSet<String>();
+	static final String defaultName = "anonymous agent";
+	private String name = defaultName;
 	
 	/**
 	 * JRPCAgentException is the root class for exceptions that might be thrown by a JRPCAgent
 	 * as a result of issuing a request or notification to its partner or handling a notification from its partner.
 	 * @author nmg	 *
 	 */
-	public abstract static class JRPCAgentException extends Exception{
+	public static class JRPCAgentException extends Exception{
 		protected JRPCAgentException(String msg) {
 			super(msg);	}
 		protected JRPCAgentException(String msg, Throwable cause) {
@@ -100,19 +113,11 @@ public abstract class JRPCAgent extends HandlerRegistration{
 		return connection;
 	}
 	
-	private final AtomicInteger requestCounter = new AtomicInteger(1);
+	private  AtomicInteger requestCounter = new AtomicInteger(1);
 	protected int nextRequestId() {
 		return requestCounter.getAndIncrement();	}
 
-	final ExecutorService executorService = Executors.newFixedThreadPool(10);
-	protected final InputStream istream;
-	protected final OutputStream ostream;
-	public InputStream getInputStream() {return istream;}
-	public OutputStream getOutputStream() {return ostream;}
-	private final Set<String>outboundMetaPropertyNames = new HashSet<String>(),
-			                                inboundMetaPropertyNames = new HashSet<String>();
-	static final String defaultName = "anonymous agent";
-	private String name = defaultName;
+	
 
 	/**
 	 * An ObjectMapper will be determined by this method for each connection between this agent and a partner.
@@ -139,8 +144,7 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	 * @param propertyNames properties to all on incoming requests/notifications/responses
 	 */
 	public void addInboundProperties(String ...propertyNames) {
-        Collections.addAll(inboundMetaPropertyNames, propertyNames);
-    }
+		for (var pname : propertyNames) inboundMetaPropertyNames.add(pname);	}
 	/**
 	 * Remove one or more properties to allow on incoming JRPC messages other than those in the JRPC standard.
 	 * @param propertyNames properties to all on incoming requests/notifications/responses
@@ -157,11 +161,10 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	
 	/**
 	 * Add one or more properties to allow on outgoing JRPC messages in addition to those in the JRPC standard.
-	 * @param propertyNames properties to all on outbound requests/notifications/responses
+	 * @param propertyNames properties to allow on outbound requests/notifications/responses
 	 */
 	public void addOutboundProperties(String ...propertyNames) {
-        Collections.addAll(outboundMetaPropertyNames, propertyNames);
-    }
+		for (var pname : propertyNames) outboundMetaPropertyNames.add(pname);	}
 	/**
 	 * Remove one or more properties to allow on outgoing JRPC messages other than those in the JRPC standard.
 	 * @param propertyNames properties to all on outgoing requests/notifications/responses
@@ -184,26 +187,28 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	/**
 	 * Create a new JRPCAgent using the two streams provided by a Socket.
 	 * @param socket the socket providing the streams
-	 * @throws IOException if a problem arises creating the serializer for the output stream
+	 * @throws IOException if a problem arises establishing the communications channels between the agents
 	 */
-	protected JRPCAgent(Socket socket) throws IOException {
-		istream= socket.getInputStream();
-		ostream = socket.getOutputStream();
+	protected JRPCAgent(Socket socket, String name) throws IOException {
+		istream = socket.getInputStream();
+		ostream = new BufferedOutputStream(socket.getOutputStream());
 		inetAddr = socket.getInetAddress();
 		port = socket.getPort();
+		if (!name.isBlank()) this.name = name;
 		primaryConnection = connectToPartner(istream, ostream);
 	}
 	
-	protected JRPCAgent(InputStream istream, OutputStream ostream) throws IOException {
+	protected JRPCAgent(InputStream istream, OutputStream ostream, String name) throws IOException {
 		this.istream = istream;
 		this.ostream = ostream;
 		inetAddr = null;
 		port = null;
+		if (!name.isBlank()) this.name = name;
 		primaryConnection = connectToPartner(istream, ostream); 
 	}
 	
-	protected JRPCObjectMapper objectMapperForConnection(Connection c) {
-		return new JRPCObjectMapper(c);}
+	protected final JsonMapper objectMapperForConnection(Connection c) {
+		return c.getPartnerMapper();} 
 
 	/**
 	 * @return the InetAddress of this agents partner, if the partner is on a network connection.
@@ -247,52 +252,26 @@ public abstract class JRPCAgent extends HandlerRegistration{
 		var sock = new Socket(inetAddr, port);
 		return connectToPartner(sock.getInputStream(), sock.getOutputStream());
 	}
-	/*public static final boolean publicOnlyReflection = (System.getSecurityManager() == null);
-	static void validateHandlerMethod(Method m) throws Exception { //validations applicable to both request and notification handlers
-		var paramCount = m.getParameterCount();
-		if (paramCount==0)
-			throw new Exception("A request or notification handler must have at least one parameter");
-		var firstType = m.getParameterTypes()[0];
-		if (!Connection.class.isAssignableFrom(firstType))
-			throw new Exception("the first parameter of a request handling method must be ServerConnection or a subclass thereof");
-		if (publicOnlyReflection && !Modifier.isPublic(m.getModifiers())) 
-		   //private methods can be executed by reflection, but if there is a security manager they must be executed
-		   //as a PrivilegedAction
-			throw new Exception("A JRPC Agent request handler must be a public method when a Java Security Manager is used");
-		if (!(Modifier.isStatic(m.getModifiers())|| JRPCAgent.class.isAssignableFrom(m.getDeclaringClass())))
-				throw new Exception("A JRPC Agent request or notification handler must be a static method or a method of a class that implements JRPCAgent");
-		
-	}*/
-	
-	/**
-	 * @return the type factory of this Agent's ObjectMapper
-	 */
-	//public TypeFactory getTypeFactory() {return getObjectMapper().getTypeFactory();}
-	
-	/*static void validateRequestHandlerMethod(Method m) throws Exception {
-		validateHandlerMethod(m);}*/
-	
 
 	static void validateNotificationType(Object jt) throws Exception {
 		Class<?> baseClass = null;
-		if (jt instanceof Class<?>) baseClass = (Class<?>)jt ;
-		else if (jt instanceof JavaType) baseClass = ((JavaType)jt).getRawClass();
-		else if (jt instanceof TypeReference<?>) {
+		if (jt instanceof Class<?> c) baseClass = c;
+		else if (jt instanceof JavaType jjt) baseClass = jjt.getRawClass();
+		else if (jt instanceof TypeReference<?> tr) {
 			//var om = new ObjectMapper( new MappingJsonFactory());
-			baseClass = TypeFactory.defaultInstance().constructType((TypeReference<?>)jt).getRawClass();
+			baseClass = TypeFactory.defaultInstance().constructType(tr).getRawClass();
 		}
 		if (!Notification.class.isAssignableFrom(baseClass))
 			throw new Exception(String.format("illegal notification type %s", jt));
 	}
-	 
-	
+
 	/**
 	 * a functional interface used for a computation that may perform a mixture of requests/notifications
 	 * on one or more connections
 	 *
 	 */
 	public interface BatchMessageComputation {
-	    void compute() throws Exception;
+	    public void compute () throws Exception;
 	}
 
 	private static final ThreadLocal<Stack<BatchRequest>> activeBatch =
@@ -349,7 +328,8 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	 * </p><p>Individual connections may be shut down via the Connection's {@link Connection#close} method.
 	 * </p>
 	 */
-	public void shutdown() {
+	@Override
+	public void close() {
 		if (shuttingDown) return;
 		shuttingDown = true;
 		//jrpcNotificationsToHandle.add(theTerminatingNotification); // thread will terminate when it sees the null
@@ -381,8 +361,8 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	public <T> T execute(PositionalParameterRequest<T> request, Object...parameters ) throws JRPCException {
 		return request.execute(primaryConnection, parameters);}	
 
-	public <T> T mexecute(PositionalParameterRequest<T> request, Map<String, TreeNode>meta,  Object...parameters ) throws JRPCException {
-		return request.mexecute(primaryConnection, meta, parameters);}
+	/*public <T> T mexecute(PositionalParameterRequest<T> request, Map<String, TreeNode>meta,  Object...parameters ) throws JRPCException {
+		return request.mexecute(primaryConnection, meta, parameters);}*/
 	
 	public <T> CompletableFuture<T> executeAsynch(NamedParameterRequest<T> request, NamedRequestParameters namedParameters) throws JRPCException {
 		return request.executeAsynch(primaryConnection, namedParameters);}
@@ -391,18 +371,18 @@ public abstract class JRPCAgent extends HandlerRegistration{
 		return request.executeAsynch(primaryConnection, parameters);}
 	
 	public void notify(NamedParameterRequest<Void> request, NamedRequestParameters namedParameters) throws JRPCException {
-		request.notify(primaryConnection, namedParameters);}
+		primaryConnection.notify(request.methodName, namedParameters);}
 
 	public void notify(PositionalParameterRequest<Void> request, Object...parameters ) throws JRPCException {
-		request.notify(primaryConnection, parameters);}
+		primaryConnection.notify(request.methodName, parameters);}
 	
-	public void notifyAsynch(NamedParameterRequest<Void> request, NamedRequestParameters namedParameters) throws JRPCException {
+	/*public void notifyAsynch(NamedParameterRequest<Void> request, NamedRequestParameters namedParameters) throws JRPCException {
 		request.notifyAsynch(primaryConnection, namedParameters);}
 
 	public void notifyAsynch(PositionalParameterRequest<Void> request, Object...parameters ) throws JRPCException {
-		request.notifyAsynch(primaryConnection, parameters);}
+		request.notifyAsynch(primaryConnection, parameters);}*/
 
-	boolean validateParameters = false;
+	//boolean validateParameters = false;
 	
 	/**
 	 * @return <code>true</code> if this JRPCAgent validates parameters prior
@@ -411,18 +391,18 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	 * the allowed range.  For named parameter requests, validation ensures the all required parameters are supplied
 	 * and that all supplied parameters are either required or optional.
 	 */
-	public boolean validatesParameters() {return validateParameters;}
+	//public boolean validatesParameters() {return validateParameters;}
 	
 	/**
 	 * @param validate <code>true</code> to make this JRPCAgent validate parameters prior
 	 * to issuing a request, <code>false</code> to leave validation to the server.
 	 * @return the previous parameter validation setting.
 	 */
-	public boolean validateParameters(boolean validate) {
+	/*public boolean validateParameters(boolean validate) {
 		var result = validateParameters;
 		validateParameters = validate;
 		return result;
-	}
+	}*/
 	
 	protected final Set<Connection> allPartners = 
 			Collections.synchronizedSet(new HashSet<Connection>());
@@ -435,20 +415,17 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	 * @param value The value to be serialized
 	 * @return the value to be passed to restoreSerializationState when the serialization is complete
 	 */
-	protected Object prepareSerializationState(JRPCObjectMapper mapper,   Map<String,TreeNode> meta, Object value) {
-		var iss = mapper.getSerializationState();
-		return (iss == null)? null : iss.setState(meta,  true);}
+	/*protected JRPCSerializationState prepareSerializationState(Connection c,   Map<String,TreeNode> meta, Object value) {
+		var iss = c.getSerializationState();
+		return (iss == null)? null : iss.setState(meta,  true);}*/
 	
 	/**
 	 * called when the serialization of a result or error response completes
-	 * @param mapper the JRPCObjectMapper being used for serialization
+	 * @param Connection the Connection on which serialization is occurring
 	 * @param restoration the value to use for restoring the serialization state (returned by updateSerializationState)
-	 * @param value The value that was serialized
 	 */
-	protected void restoreSerializationState(JRPCObjectMapper mapper, Object restoration, Object value) {
-		var iss = mapper.getSerializationState();
-		if (iss != null) iss.restoreState(restoration, true);
-	}
+	//protected void restoreSerializationState(Connection c, Object restoration) {
+	//	c.getSerializationState().restoreStateForGenerating(restoration);}
 	
 	/**
 	 * called at the start of a top-level deserialization
@@ -456,20 +433,18 @@ public abstract class JRPCAgent extends HandlerRegistration{
 	 * @param request If this top level deserialization is for the response of a request, this is that request.  If not, this is null.
 	 * @return the value to be passed to restoreSerializationState when the deserialization is complete
 	 */
-	final Object prepareDeserializationState(JRPCObjectMapper mapper, Map<String,TreeNode> meta) {
-		var ids = mapper.getDeserializationState();
+	/*final Object prepareDeserializationState(Connection c, Map<String,TreeNode> meta) {
+		var ids = c.getDeserializationState();
 		return (ids == null)? null : ids.setState(meta, true);
-	}
+	}*/
 	
 	/**
 	 * called when a top-level deserialization completes
 	 * @param mapper the JRPCObjectMapper being used for serialization
 	 * @param restoration the value to use for restoring the deserialization state (returned by setSerializationState)
 	 */
-	public void restoreDeserializationState(JRPCObjectMapper mapper, Object restoration) {
-		var ids = mapper.getDeserializationState();
-		if (ids != null) ids.restoreState(restoration, true);
-	}
+	//public void restoreDeserializationState(Connection c, Object restoration) {
+	//	c.getSerializationState().restoreStateForParsing(restoration);}
 
 
 	/*public static Class<?> genericBaseClass(java.lang.reflect.Type tp){
@@ -484,9 +459,25 @@ public abstract class JRPCAgent extends HandlerRegistration{
 		}
 		return null;
 	}*/
-	/*
-	 public  java.util.function.Consumer<Integer> foo() {return null;}
-	 public static void main(String[] args) throws Exception {
+	
+	 //public  java.util.function.Consumer<Integer> foo() {return null;}
+	 /*public static class Foo {
+		 @JsonProperty("s")
+		 Short s;
+		 Foo(Short s){this.s = s;}
+		 public Foo() {} //for deserializing
+		 
+	 }*/
+	 /*public static void main(String[] args) throws Exception {
+		 var mapper = JsonUtilities.jsonMapper();
+		 var parser = mapper.createParser(" { \"s\" : null }  ");
+		 var foo = parser.readValueAs(Foo.class);
+		 var ostream = new ByteArrayOutputStream();
+		 var generator = mapper.createGenerator(ostream);
+		 mapper.writeValue(generator, foo);
+		 var generated = new String(ostream.toByteArray());
+		 
+		 generated = generated;
 		var m = JRPCAgent.class.getMethod("foo");
 		var art = m.getAnnotatedReturnType();
 		var tf = TypeFactory.defaultInstance();
