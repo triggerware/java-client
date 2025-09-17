@@ -1,18 +1,22 @@
 package calqlogic.twservercomms;
 
-
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.time.*;
+import java.util.HashMap;
+import java.util.List;
 
 
-import com.fasterxml.jackson.annotation.*;
-import com.fasterxml.jackson.core.*;
-import calqlogic.twservercomms.PolledQueryCalendarSchedule.ScheduleFormatException;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.*;
+import calqlogic.twservercomms.AbstractQuery.SignatureElement;
+import calqlogic.twservercomms.PreparedQuery.PositionalParameterDeclarations;
+import calqlogic.twservercomms.TWResultSet.TWResultSetException;
 import calqlogic.twservercomms.TriggerwareClient.TriggerwareClientException;
 import nmg.softwareworks.jrpcagent.*;
 import nmg.softwareworks.jrpcagent.Logging.ILogger;
-
+import nmg.softwareworks.jrpcagent.PositionalParameterRequest;
 
 class Test {
 	
@@ -21,84 +25,23 @@ class Test {
 		public TestClient(InetAddress twHost, int twServerPort) throws Exception {
 			super("test client", twHost, twServerPort);	}
 		
+		private static PositionalParameterRequest<Void> noopRequest = 
+				new PositionalParameterRequest<Void>(Void.TYPE, /*null,*/ "noop", 0, 0);	
+		void noop()throws JRPCException {
+			noopRequest.execute(primaryConnection);	}		
 	}
 
-	/*static String sample = 
-			"{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":{\"batch\":{\"count\":4,\"exhausted\":true,\"tuples\":[[14,15],[13,14],[12,13],[11,12]]}}}  []";
-	
-
-	private static void parseTest(String json) 
-			throws JsonParseException, IOException {
-		var input = isFromString(json); //new java.io.ByteArrayInputStream(json.getBytes());
-		var fromTW = new JsonUtilities.TWStreamParser(input); 
-		fromTW.startLogging();
-		var msg = fromTW.next();
-		var msgText = fromTW.logEntryComplete();
-		var rslt = msg.get("result");
-		TWResultSet rs = null;
-		TWResultSet.Batch.fromJson((ObjectNode)rslt, rs);
-	}*/
-	/*private static String serializeTest() throws IOException {
-		 var jfactory = new MappingJsonFactory();
-		 var baos = new java.io.ByteArrayOutputStream();
-		 var gen = jfactory.createGenerator(baos);
-		 var om = new ObjectMapper(jfactory);
-		om.writeValue(gen, new PolledQuerySchedule());
-		result.add(new Object[] {"a", 1});
-		result.add(new Object[] {"b", 2});
-		result.add(new Object[] {"c", 3});
-		var qr = new QueryResponse<Object[]>( result, new String[]{"c1", "c2"}, "done");
-		om.writeValue(gen, qr);
-		//om.writeValue(gen, JRPCRequest.class);
-		var json = baos.toString();
-		return json;		
-	}*/
-	/*private static class Address {
-		//@JsonProperty("streetNumber")
-		private int streetNumber;
-		//@JsonProperty("streetName")
-		private String streetName;
-		@JsonCreator 
-		public Address(@JsonProperty("streetName") String name, @JsonProperty("streetNumber") int n){
-	      this.streetName = name; 
-	      this.streetNumber = n; 
+	private static void parserTest(Class<?>cls, String json) {
+		 var instream =   new ByteArrayInputStream(json.getBytes()); 
+		 var om = new ObjectMapper(new MappingJsonFactory());
+		 try {
+			 var parsed = om.readValue(instream, cls);
+			 parsed = parsed;
+		} catch (Exception e) {
+			e = e;
 		}
-	}*/
+	}
 
-	@JsonFormat(shape=JsonFormat.Shape.ARRAY)
-	/*@JsonPropertyOrder({ "age",  "address", "name", "nicks" })  //the braces are not Json -- they construct an array param value for a Java annotation
-	private static class Person{
-		private int age;
-		private String name;
-		private ArrayList<String> nickNames;
-		private Address address;
-		public int getAge() {return age;}
-		public String getName() {return name;}
-		public String getAddress() {return name;}
-		public ArrayList<String>getNickNames(){return nickNames;}
-	}*/
-	/*private static ArrayList[] ArrayOfArrayListDeserializeTest() throws  IOException {
-		var jfactory = new MappingJsonFactory();
-		JsonParser jParser = jfactory.createParser("[ [32.5] , [44] ] ");
-		var javaVal = jParser.readValueAs(java.util.ArrayList[].class);
-		return javaVal;
-	}*/
-	/*public static class ClassDeserializer extends StdDeserializer<Class> {
-
-	    public ClassDeserializer(Class vc) {      super(vc);   }
-
-	    @Override
-	    public Class<?> deserialize(JsonParser parser, DeserializationContext deserializer) throws IOException {	    	
-	        if (JsonToken.VALUE_STRING == parser.currentToken()){
-	        	var typeName = parser.getText();
-				try {
-					var klass = Class.forName(typeName);
-					return klass;
-				} catch (ClassNotFoundException e) {return null;}
-	        }
-	        return null;
-	    }
-	}*/
 	/*private static void pqNotificationDeserializeTest () {
 		 var now = Instant.now().toString();
 		 //var pqNotification = "{\"handle\" : 3, \"timestamp\" : \"" +now + "\", \"error\" : \"this is wrong\"}";
@@ -117,79 +60,7 @@ class Test {
 			e2.printStackTrace();
 		}
 	}*/
-	/*private static Class classDeserializeTest() throws  IOException {
-		//var module =  new SimpleModule("ClassDeserializer");
-		//module.addDeserializer(Class.class, new ClassDeserializer(Class.class));
-		var mapper = new ObjectMapper();
-		//mapper.registerModule(module);
-		var jfactory = new MappingJsonFactory();
-		var jParser = jfactory.createParser("\"calqlogic.twservercomms.JRPCRequest\"");
-		var klass = mapper.readValue(jParser,Class.class);
-	    return klass;
-	}*/
-	/*private static Person tupleDeserializeTest() throws JsonParseException, IOException { 
-		String json = "[ 33, {\"streetName\" : \"Washington\", \"streetNumber\" : 378}, \"Joseph\", [\"Joey\"] ] ";
-		var jfactory = new MappingJsonFactory();
-		var jParser = jfactory.createParser(json);				
-		var ip = jParser.readValueAs(Person.class);
-		// now try using a type reference
-		jParser = jfactory.createParser(json);
-		ip = jParser.readValueAs(new TypeReference<Person>() {});
-		return ip;
-	}*/
-	/*
-	@JsonFormat(shape=JsonFormat.Shape.ARRAY)
-	@JsonPropertyOrder({"calls"})
-		//,  "categories", "resolutions", "locations", "counters" })  //the braces are not Json -- they construct an array param value for a Java annotation
-	private static class RequestData{
-		public Object[] calls;
-		private String[] categories;
-		private String[] resolutions;
-		private String[] locations;
-		private Object[] counters;
-		public Object[] getCalls() {return calls;}
-		public String[] getCategories(){return categories;}
-		public String[] getResolutions() {return resolutions;}
-		public String[] getLocations() {return locations;}
-		public Object[] getCounters() {return counters;}
-	}
-	private static RequestData tupleDeserializeTest2() throws JsonParseException, IOException{
-		String json = "[null," +
-             	 "[\"Cement\",\"Food\",\"Furniture\",\"Insulin\",\"Vans\",\"Water\"], " +
-           	 "[\"Denied\",\"Dispatched\",\"Outsourced\"]," + 
-           	 "[\"Abandoned Mill\",\"Cedars Sinai\",\"Founders Bank\",\"Fox Hills Mall\",\"Mayfield High\",\"Museum\"], " +
-           	 "[[\"REQUEST-COUNT-OVERALL\",0],[\"UNRESOLVED-REQUEST-COUNT\",0],[\"HOSPITAL-SURGE-COUNT\",0],[\"SURGE-COUNT\",0],[\"LATE-RESOLUTIONS-COUNT\",0]]]";
-           	 
-		var jfactory = new MappingJsonFactory();
-		var jParser = jfactory.createParser(json);
-		var javaVal = jParser.readValueAs(RequestData.class);
-		return javaVal;
-	}*/
-	
-	private static InputStream isFromString(String json) {
-        return new ByteArrayInputStream(json.getBytes());}
-	
-	/*private static String serializeTest(Object v) throws IOException {
-		 var jfactory = new MappingJsonFactory();
-		 var baos = new java.io.ByteArrayOutputStream();
-		 var gen = jfactory.createGenerator(baos);
-		 var om = new ObjectMapper(jfactory);
-		om.writeValue(gen, v);
-		var json = baos.toString();
-		return json;		
-	}*/
-	/*private static QueryStatement.ExecuteQueryResult<Address> executeQueryDeserializeTest() throws JsonParseException, IOException {
-		var jfactory = new MappingJsonFactory();
-		var om = new ObjectMapper(jfactory);
-		JsonParser jParser = jfactory.createParser(
-				"{\"handle\" : null, \"tuples\": [{\"streetName\" : \"Washington\", \"streetNumber\" : 378}]} ");
 
-		//var jt = om.getTypeFactory().constructParametricType(QueryStatement.ExecuteQueryResult.class, Address.class);
-		
-		//var xx = ( QueryStatement.ExecuteQueryResult<Address>)om.readValue(jParser,jt)	;
-		var xx = (QueryStatement.ExecuteQueryResult<Address>)jParser.readValueAs(new TypeReference<QueryStatement.ExecuteQueryResult<Address>>() {});
-		return xx;
-	}*/
 	/*private static QueryResponse<PerformanceTesting.IntegerPair> queryResponseDeserializeTest() throws  IOException {
 		var jfactory = new MappingJsonFactory();
 		var om = new ObjectMapper(jfactory);
@@ -211,88 +82,327 @@ class Test {
 		var xx = om.readValue(jParser,jt)	;
 		return (PreparedQueryResult<PerformanceTesting.IntegerPair>)xx;
 	}*/
-	static void testPreparedQuery(TriggerwareClient twc) throws JRPCException, TriggerwareClientException {
+	/*static void testPreparedQuery(TestClient twc) throws JRPCException, TriggerwareClientException {
 		var query = "select * from bizfilefind, bizfiledetails where searchfor= :company and bizfilefind.id = bizfiledetails.id";
-		var pq = new PreparedQuery(Object[].class,query, Language.SQL,"AP5", twc);
-		pq.setParameter("company", "ibm");
-		var rs = pq.executeQuery();
-		rs = rs;
-	}
-	/*private static TWResultSet<Object[]> testPreparedQuery(TriggerwareClient client) throws JRPCException, TriggerwareClientException{
+		try (var pq = new PreparedQuery<Object[]>(Object[].class,query, Language.SQL,"AP5", null, twc)){
+			pq.setParameter("company", "ibm");
+			var rs = pq.executeQuery();
+			rs = rs;
+		}
+	}*/
+	/*private static TWResultSet<Object[]> testPreparedQuery(TestClient client) throws JRPCException, TriggerwareClientException{
 		var pq = new PreparedQuery<Object[]>(Object[].class, 
 				"select * from [csimarket-competition] where  companysymbol = 'AMGN'", 
 				 "AP5", client);
 		var rs = pq.executeQuery();
 		return rs;
 	}*/
-	/*private static void testObjectDeserialization() throws IOException {
-		var jfactory = new MappingJsonFactory();
-		var jParser = jfactory.createParser("true");
-		var xxx = jParser.readValueAs(Object.class);
-		jParser = jfactory.createParser("null");
-		xxx = jParser.readValueAs(Object.class);
-		jParser = jfactory.createParser("-44");
-		xxx = jParser.readValueAs(Object.class);
-		jParser = jfactory.createParser("-44");
-		xxx = jParser.readValueAs(Long.class);
-		jParser = jfactory.createParser("-44");
-		xxx = jParser.readValueAs(Float.TYPE);
-		jParser = jfactory.createParser("-44");
-		xxx = jParser.readValueAs(Double.TYPE);
-		jParser = jfactory.createParser("37.8");
-		xxx = jParser.readValueAs(Object.class);
-		jParser = jfactory.createParser("37.8");
-		xxx = jParser.readValueAs(Integer.class);
-		jParser = jfactory.createParser("\"abc\"");
-		xxx = jParser.readValueAs(Object.class);
-		jParser = jfactory.createParser("[1,2,3]");
-		xxx = jParser.readValueAs(Object.class);
-		jParser = jfactory.createParser("[1,2,3]");
-		xxx = jParser.readValueAs(Object[].class);
-		jParser = jfactory.createParser("[[1],[2],[3]]");
-		xxx = jParser.readValueAs(Object[][].class);
-		return;
-	}*/
-	
-	private static class SamplePolledQuery extends ScheduledQuery<int[]> { 
-		//static TypeReference<PolledQueryNotification<int[]>> tr = new TypeReference<PolledQueryNotification<int[]>>() {};
+
+	public static class JustTheTimestamp{
+		final Instant time;
+		@DeserializationConstructor
+		public JustTheTimestamp(Instant time){
+			  this.time = time;}
+		@Override
+		public String toString() {
+			return String.format("JTS: %s", time);
+		}
+	}
+
+	public static class JustTheDuration{
+		final Duration dur;
+		@DeserializationConstructor
+		public JustTheDuration(Duration dur){
+			  this.dur = dur;}
+		@Override
+		public String toString() {
+			return String.format("JTS: %s", dur);
+		}
+	}
+
+	private static class PolledTimestampQuery extends PolledQuery<JustTheTimestamp>{
+		//for testing unscheduled polling
+		private final int nPolls; // number of polling operations
+		private final Object pollingDone; //to signal caller when nPolls have reported
+        private int pollsSoFar = 0;
+		PolledTimestampQuery(TriggerwareClient client, int nPolls, Object pollingDone) throws JRPCException, TriggerwareClientException{
+			super(client, JustTheTimestamp.class,  "SELECT current_timestamp() as now",  "AP5-SQL-RUNTIME",
+					new PolledQueryControlParameters(true, true, null));
+			this.nPolls = nPolls;
+			this.pollingDone = pollingDone;
+		}
+		private void noMorePolling() {
+			this.close();
+			synchronized(pollingDone) {pollingDone.notify();}			
+		}
+
+		@Override
+		public void handleSuccess(RowsDelta<JustTheTimestamp> delta, Instant ts) {//the ts is the timestamp of the delta, nothing to do with the data items!!!
+			Logging.log("SamplePolledQuery reports change as of %s.%n added=%s deleted=%s", 
+					ts, delta.getAdded(), delta.getDeleted());
+			pollsSoFar++;
+			if (pollsSoFar < nPolls)
+				try {
+					Thread.sleep(5000);
+					this.poll();
+				} catch (Exception e) {}
+			else noMorePolling();
+		}
+		@Override
+		public void handleError(String errorText, Instant ts) {
+			super.handleError(errorText, ts);
+			pollsSoFar++;
+			if (pollsSoFar < nPolls)
+				try {this.poll();
+				} catch (Exception e) {}
+			else noMorePolling();
+		}
+	}
+	private static class ScheduledTimestampQuery extends ScheduledQuery<JustTheTimestamp> {
 		
-		SamplePolledQuery(PolledQuerySchedule schedule, TriggerwareConnection connection) throws JRPCException{
-			super(int[].class, schedule, "((n)s.t.(volatile n))", Language.FOL, "AP5",connection,
+		//static TypeReference<PolledQueryNotification<int[]>> tr = new TypeReference<PolledQueryNotification<int[]>>() {};
+		ScheduledTimestampQuery(TriggerwareClient client, PolledQuerySchedule schedule) throws JRPCException, TriggerwareClientException{
+			super(client, JustTheTimestamp.class,  "SELECT current_timestamp() as now",  "AP5-SQL-RUNTIME", schedule,
 					new PolledQueryControlParameters(true, true, null));}
 
 		@Override
-		public void handleSuccess(RowsDelta<int[]> delta, Instant ts) {
+		public void handleSuccess(RowsDelta<JustTheTimestamp> delta, Instant ts) {//the ts is the timestamp of the delta, nothing to do with the data items!!!
+			Logging.log("SamplePolledQuery reports change as of %s.%n added=%s deleted=%s", 
+					ts, delta.getAdded(), delta.getDeleted());}
+		@Override
+		public void handleError(String errorText, Instant ts) {
+			super.handleError(errorText, ts);	}
+	}
+	private static class ScheduledDurationQuery extends ScheduledQuery<JustTheDuration> {
+		
+		//static TypeReference<PolledQueryNotification<int[]>> tr = new TypeReference<PolledQueryNotification<int[]>>() {};
+		ScheduledDurationQuery(TriggerwareClient client, PolledQuerySchedule schedule) throws JRPCException, TriggerwareClientException{
+			super(client, JustTheDuration.class,  "SELECT current_timestamp() - TIMESTAMP '2025-04-15 12:00:00'  as elapsed",  "AP5-SQL-RUNTIME", schedule,
+					new PolledQueryControlParameters(true, true, null));}
+
+		@Override
+		public void handleSuccess(RowsDelta<JustTheDuration> delta, Instant ts) {//the ts is the timestamp of the delta, nothing to do with the data items!!!
 			Logging.log("SamplePolledQuery reports change as of %s.%n added=%s deleted=%s", 
 					ts, delta.getAdded(), delta.getDeleted());}
 		@Override
 		public void handleError(String errorText, Instant ts) {//just log
 			super.handleError(errorText, ts);	}
 	}
-	private static QueryStatement simpleQueryTest(TriggerwareClient client) 
-			throws JRPCException, TriggerwareClientException {
-		var qs = new QueryStatement(client);
-		qs.setFetchSize(10);
-		var sql = //"SELECT symbol FROM StockSymbol WHERE exchange = 'NASDAQ'";
-				"select * from device where MANUFACTURER_D_NAME like '%MEDTRONIC%' ";
-		var rs = qs.executeQuery(sql, "AP5");		
-		return qs;
+	/*public class JustOneNumber{
+		Integer n;
+		@DeserializationConstructor
+		public JustOneNumber(Integer n) {
+			this.n = n;}
+	}*/
+	public static class JustNumbers{
+		final BigInteger bi;
+		final Long l;
+		final Integer n;
+		final Short s;
+		final Byte b;
+		final Double d;
+		final Float f;
+		@DeserializationConstructor
+		public JustNumbers(BigInteger bi, Long l, Integer n, Short s, Byte b, Double d, Float f) {
+			this.bi = bi; this.l = l; this.n = n; this.s = s; this.b = b;
+			this.d = d; this.f = f;
+			}
 	}
-	private static PolledQuery<int[]> polledQueryTest(TriggerwareClient client) 
+	public static class JustText{
+		final String sensitive;
+		final String insensitive;
+		@DeserializationConstructor
+		public JustText(String s, String is) {
+			sensitive = s; insensitive = is;}
+	}
+	public static class PubmedRecord{
+		final String  id;
+		final String title;
+		@DeserializationConstructor
+		public PubmedRecord(String id, String title) {
+			this.id = id; this.title = title;}
+		
+	}
+	public static class InflationRecord{
+		final int year1;
+		final int year2;
+		final Float factor;
+		@DeserializationConstructor
+		public InflationRecord(int year1, int year2, Float factor) {
+			this.year1 = year1; this.year2 = year2; this.factor = factor;}
+	}
+	public static class FOLQueryStatement extends QueryStatement{
+		public FOLQueryStatement(TriggerwareClient client) {
+			super(client);
+		}
+
+		@Override
+		protected NamedRequestParameters commonParams(String query, String schema) {
+			return new NamedRequestParameters().with("query", query).with("language", "fol").with("namespace", schema);}
+
+		@Override
+	    public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
+			@SuppressWarnings("unchecked")
+			var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+			dsstate.put("FOL", true);	
+	    }
+	}
+
+	private static void showRow(Object[] row) {
+		var sb = new StringBuilder();
+		for (var obj : row) 
+			sb.append(obj.toString()).append("  ");
+		Logging.log(sb.toString());
+	}
+	/*public static String testResult = 
+		{"signature":[{"attribute":"_SEL__1","type":"anyint"},{"attribute":"_SEL__2","type":"bigint"},{"attribute":"_SEL__3","type":"integer"},{"attribute":"_SEL__4","type":"smallInt"},{"attribute":"_SEL__5","type":"tinyInt"},{"attribute":"_SEL__6","type":"Double"},{"attribute":"_SEL__7","type":"Float"}],
+				"batch":{"count":1,"exhausted":true,"tuples":[[3000000,300000,30000,3000,35,2238.769987,2238.77]]}}*/
+	private static void testAdhocQueries(TriggerwareClient client) 
+			throws JRPCException, TriggerwareClientException {
+
+		String sql; SignatureElement[]sig;
+
+		try(var fqs = new FOLQueryStatement(client)){
+			fqs.setFetchSize(6);
+			var fol = "((factor) s.t. (demo::inflation 1995 2000 factor))";			
+			try (var rsxxx = fqs.executeQuery(Object[].class, fol, "AP5")){
+				while (rsxxx.next()) {
+					var nextRow = rsxxx.get();
+					showRow((Object[])nextRow);
+				}
+			}catch(Exception rse) {
+				rse = rse;
+			}
+		}
+		
+		try(var qs = new QueryStatement(client)){
+			sql = "SELECT 55";
+			var rsxxx = qs.executeQuery(Object[].class, sql, "AP5");
+			
+			sql = "SELECT * FROM demo.inflation WHERE year1 = 1998 AND year2 = 2006";
+			var rsPMS = qs.executeQuery(InflationRecord.class, sql, "AP5");
+			sig = rsPMS.getRowSignature();
+			try {
+				while (rsPMS.next()) {
+					var nextRow = (InflationRecord)(rsPMS.get());
+					Logging.log("year1 = %d, year2 = %d, factor = %f", nextRow.year1, nextRow.year2, nextRow.factor);
+				}
+			}catch(Exception rse) {
+				rse = rse;
+			}
+
+			sql = """
+					SELECT CAST(3000000 as ANYINT), CAST(300000 AS BIGINT), CAST (30000 AS INTEGER),  CAST (3000 AS SMALLINT), CAST(35 AS TINYINT),
+					CAST(2238.769987 AS DOUBLE), CAST(2238.769987 AS FLOAT)
+					""";
+		   var rsNum = qs.executeQuery(JustNumbers.class, sql, "AP5");
+		   sig = rsNum.getRowSignature();
+		   //sig = sig;
+		   sql = "SELECT 'abc', 'xyz' COLLATE ci ";
+		   var rsText = qs.executeQuery(JustText.class, sql, "AP5");
+		   sig = rsText.getRowSignature();
+		   //sig = sig;
+		   
+		   sql = "SELECT Current_timestamp() as now, current_date()as today, current_time() as clock, INTERVAL 3 DAY as howlong";
+		   var rsTemporal = qs.executeQuery(TemporalFields.class, sql, "AP5");
+		   sig = rsTemporal.getRowSignature();
+			/*sql = 
+					"SELECT * FROM device WHERE MANUFACTURER_D_NAME LIKE '%MEDTRONIC%' ";
+			rs = qs.executeQuery(sql, "AP5");	
+			rs=rs;*/
+		}
+		try(var qs = new QueryStatement(client)) {
+			var noMoreRows = new Object();
+			var controller = new NotificationResultController<PubmedRecord>(PubmedRecord.class,  2 , null, null) {//6 rows, 2 at a time
+				@Override
+				public boolean handleRows(List<PubmedRecord> rows, boolean exhausted) {
+					for (var pm : rows) {
+						Logging.log("notification of PubmedRecord: id = %s, title = %s", pm.id, pm.title);	}
+					if (exhausted) {
+						Logging.log("no more notifications of PubmedRecord");	
+						synchronized(noMoreRows) {noMoreRows.notify();}
+						return false;
+					}
+					return true;
+				}};
+			sql = "SELECT pmid,title FROM [sql-relations].[pubmed-search] WHERE query='toenail' AND title LIKE '%o%'";
+			qs.executeQueryWithNotificationResults(PubmedRecord.class, sql,  "AP5",  controller);
+			synchronized(noMoreRows) {try { noMoreRows.wait();
+			} catch (InterruptedException e) {}}
+		}
+	}
+	private static void testPreparedQueries(TriggerwareClient client) 
+			throws JRPCException, TriggerwareClientException {
+
+		var pdecls = new PositionalParameterDeclarations(); pdecls.add("integer");
+		try(var pq = new PreparedQuery<InflationRecord>(client, InflationRecord.class, "SELECT * FROM demo.inflation WHERE year1 = 1998 AND year2 = ?",
+				"AP5", pdecls)){
+			pq.setFetchSize(1);
+			pq.setParameter(1, 2006);
+			try(var rsINF = pq.createResultSet()){
+				try {
+					while (rsINF.next()) {
+						var nextRow = (InflationRecord)(rsINF.get());
+						Logging.log("year1 = %d, year2 = %d, factor = %f", nextRow.year1, nextRow.year2, nextRow.factor);
+					}
+				}catch(TWResultSetException rse) {rse = rse;}
+			}
+			/*var noMoreRows = new Object();
+			var controller = new NotificationResultController<PubmedRecord>(PubmedRecord.class,  pq.getFetchSize(), null, null) {
+				@Override
+				public boolean handleRows(List<PubmedRecord> rows, boolean exhausted) {
+					for (var pm : rows) {
+						Logging.log("notification of PubmedRecord: id = %s, title = %s", pm.id, pm.title);	}
+					if (exhausted) {
+						Logging.log("no more notifications of PubmedRecord");	
+						synchronized(noMoreRows) {noMoreRows.notify();}
+						return false;
+					}
+					return true;
+				}};
+			pq.setParameter(1, "%o%");
+			pq.executeQueryWithNotificationResults(controller);
+			synchronized(noMoreRows) {try {noMoreRows.wait();
+			} catch (InterruptedException e) {}}*/
+		}
+	}
+	
+
+	private static void testPolledQueries(TriggerwareClient client) 
+			throws JRPCException, TriggerwareClientException {
+		var pollingDone = new Object();
+		var pqt1 = new PolledTimestampQuery(client, 5, pollingDone);
+		pqt1.register();
+		pqt1.poll();
+		synchronized(pollingDone) {try {pollingDone.wait(); pqt1.close();
+		} catch (InterruptedException e) {}};
+
+		var schedule = new PolledQueryPeriodicSchedule(Duration.ofSeconds(10));
+		var pqt2 = new ScheduledTimestampQuery(client, schedule);
+		pqt2.register();
+		pqt2.activate();
+		try {Thread.sleep(60*1000);//1 minute
+		} catch (InterruptedException e) {}
+		pqt2.close();
+		
+
+		/*var pqd = new ScheduledDurationQuery(client, schedule);
+		pqd.register();
+		pqd.activate();
+		try {
+			Thread.sleep(3*60*1000);//3 minutes
+		} catch (InterruptedException e) {
+		}
+		pqd.close();*/
+	}
+	/*private static PolledQuery<int[]> polledQueryTest(TriggerwareClient client) 
 			throws JRPCException, TriggerwareClientException {
 		//var schedule = new PolledQueryPeriodicSchedule(Duration.ofSeconds(5));
 		var schedule = new PolledQueryCalendarSchedule();
 		try {
 			schedule.setHours("*").setMinutes("*").setDays("1-31");
 		} catch (ScheduleFormatException e1) {	}
-		/*var baos = new java.io.ByteArrayOutputStream();
-		try {
-			client.serialize(schedule, baos);
-			var json = baos.toString();
-			return null;
-		} catch (IOException e1) {}*/
 		var pq = new SamplePolledQuery(schedule, client.getPrimaryConnection());
-		//pq.register(client);
 		pq.activate();
 		try {
 			//Thread.sleep(30000); // 30 seconds for periodic
@@ -302,14 +412,45 @@ class Test {
 			
 		}
 		return pq;
+	}*/
+	public static class TemporalFields {
+		  @JsonProperty("ldt")
+		  private Instant instant = Instant.now();
+
+		  @JsonProperty("ld")
+		  private LocalDate localDate= LocalDate.of(1947,6,13);
+
+		  @JsonProperty("lt")
+		  private LocalTime localTime= LocalTime.NOON.plusMinutes(15).plusSeconds(23);
+		  
+		  @JsonProperty("dur")
+		  private Duration duration = Duration.ofDays(2).plusHours(11).plusMinutes(15).plusSeconds(27).plusNanos(1000*1000*492 +722);
+		  @DeserializationConstructor
+		  public TemporalFields(Instant i, LocalDate ld, LocalTime lt, Duration dur){
+			  instant = i; localDate = ld; localTime = lt; duration = dur;
+		  }
 	}
+	
+	/*private static void testTime() {
+		String jsonString = "\"2024-04-13T13:30:00Z\"";
+
+        var mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+		mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+		mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS"));
+        //objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+		try {
+	        var jParser = mapper.createParser(jsonString);
+	        var instant =  mapper.readValue(jsonString, Instant.class);
+	        instant = instant;
+		} catch (Exception e) {
+			e = e;		}
+
+	}*/
+
 	//to debug TW server, telnet localhost 8226..When done, enter the zero (0) command to leave the telnet session
 	public static void main(String[] args) throws Exception {
-		//marketData("^GSPC");
-		/*var d = Double.MAX_VALUE;
-        d = Double.MAX_VALUE + 1.0;
-        d = 50.0 + Double.MAX_VALUE ;
-        d = Double.MAX_VALUE + Double.MAX_VALUE;*/
+
 		Logging.setLogger(new ILogger() {
 			@Override
 			public synchronized void log (String event) {System.out.println(event);}
@@ -319,9 +460,20 @@ class Test {
 				System.err.println(event);
 				}
 			@Override
-			public synchronized void log (String format, Object ... args) {System.out.printf((format) + "%n",args);}
+			public synchronized void log (String format, Object ... args) {System.out.println(String.format(format,args));}
 		});
-		//var json = serializeTest();
+
+		//jsonTest();
+		//blobTest();
+		//temporalTest();
+		/*parserTest( PreparedQuery.PreparedQueryRegistration.class, """
+				{"signature":[{"attribute":"year1","type":"smallInt"},{"attribute":"year2","type":"smallInt"},{"attribute":"factor","type":"Float"}],
+				 "handle":1,
+				 "inputSignature":[{"attribute":"?1","type":"int"}],
+				 "usesNamedParameters":false}
+				""");*/
+		
+		//serializePQDeclTest();
 		//var aa = ArrayOfArrayListDeserializeTest();
 		//Person ppp = tupleDeserializeTest();
 		//String sss = serializeTest(ppp);
@@ -335,19 +487,15 @@ class Test {
 		int n = javaVal.length;*/
 		//var tpl = JsonUtilities.deserializeArrayAsTuple(jParser, new Class<?>[] {Double.TYPE, Double.TYPE});
 		//var tkn = jParser.currentToken();
+		//var s = new Socket(InetAddress.getLoopbackAddress(),5221);
+		//int x = s.getSendBufferSize();
 		var twClient = new TestClient(InetAddress.getLoopbackAddress(),5221);
-		testPreparedQuery(twClient);
-		/*while (true) {
-			try{
-				var tsq = simpleQueryTest(twClient);
-				tsq.close();
-				break;
-			}catch (Throwable t) {
-				t=t;
-			}
-		}*/
-		var tpq = polledQueryTest(twClient);
-		tpq.closeQuery();
+		testAdhocQueries(twClient);
+		testPreparedQueries(twClient);
+		//testPolledQueries(twClient);
+		
+		//var tpq = polledQueryTest(twClient);
+		//tpq.close);
 		//PerformanceTesting.testPreparedQuery(twClient);
 	}
 

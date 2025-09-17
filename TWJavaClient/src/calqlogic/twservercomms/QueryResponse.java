@@ -6,17 +6,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-/**
- * @author nmg
- *
- */
-
-
 @JsonFormat(shape=JsonFormat.Shape.OBJECT)
-public class QueryResponse<T> {
-	private final String completionStatus;
-	private final ArrayList<T> rows;
-	private final String[] columns;
+class QueryResponse<T> {
+	private String completionStatus;
+	private ArrayList<T> rows;
+	private String[] columns;
 	
 	@JsonCreator
 	public QueryResponse(@JsonProperty("result")ArrayList<T> rows, @JsonProperty("columns")String[]columns,

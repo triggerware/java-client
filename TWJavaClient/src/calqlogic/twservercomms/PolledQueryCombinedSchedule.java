@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.util.HashSet;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 /**
  * a PolledQueryCombinedSchedule provides a schedule that will cause the TW server to poll a ScheduledQuery
@@ -18,7 +20,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
  *
  */
 @JsonSerialize(using = PolledQueryCombinedSchedule.Serializer.class)
-public class PolledQueryCombinedSchedule {
+public class PolledQueryCombinedSchedule implements PolledQuerySchedule{
 	
 	private final HashSet<PolledQueryCalendarSchedule> schedules = new HashSet<>();
 	/**
@@ -62,9 +64,16 @@ public class PolledQueryCombinedSchedule {
 		public void serialize(PolledQueryCombinedSchedule csched, JsonGenerator gen, SerializerProvider sp)
 				throws IOException {
 			gen.writeStartArray();
-			for (var sched:csched.schedules) {
+			for (var sched : csched.schedules) {
 				gen.writeObject(sched);}
 			gen.writeEndArray();			
 		}		
+	}
+	@Override
+	public JsonNode asJson() {
+		var ja = JsonNodeFactory.instance.arrayNode();
+		for (var sched : schedules)
+			ja.add(sched.asJson());
+		return ja;
 	}
 }

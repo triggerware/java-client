@@ -6,7 +6,7 @@ import nmg.softwareworks.jrpcagent.JRPCException;
 
 
 interface BlobReferenceSupport <E extends JRPCException> {
-	byte[] downloadBlobContent(JsonNode connectorKey) throws  E;
-    String getConnectorId();
+	public byte[] downloadBlobContent(JsonNode connectorKey) throws  E;
+    public String getConnectorId();
 }
 

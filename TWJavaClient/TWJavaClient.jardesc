@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jardesc>
+    <jar path="TWJavaClient/TWJavaClient2.0.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/TWJavaClient/TWJavaClient.jardesc" exportErrors="false" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="/TWJavaClient/manifest" manifestVersion="1.0" reuseManifest="false" saveManifest="true" usesManifest="true">
+        <sealing sealJar="true">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{AbstractQuery.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{Batch.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{BatchNotification.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{BatchRows.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{BatchSubscription.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{BlobReferenceSupport.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{DataBlob.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{DeserializationConstructor.java"/>
+        <folder path="/TWJavaClient/src/META-INF"/>
+        <file path="/TWJavaClient/.classpath"/>
+        <file path="/TWJavaClient/src/log4j2.xml"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{Language.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{NotificationResultController.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PolledQuery.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PolledQueryCalendarSchedule.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PolledQueryCombinedSchedule.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PolledQueryNotification.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PolledQueryPeriodicSchedule.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PolledQuerySchedule.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{PreparedQuery.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{QueryPushNotification.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{QueryResponse.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{QueryStatement.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{RowsDelta.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{ScheduledQuery.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{Statement.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{Subscription.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{SubscriptionNotification.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{TWBuiltInTypes.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{TWJson.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{TWResultSet.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{TriggerwareClient.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{TriggerwareConnection.java"/>
+        <javaElement handleIdentifier="=TWJavaClient/src&lt;calqlogic.twservercomms{package-info.java"/>
+    </selectedElements>
+</jardesc>

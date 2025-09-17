@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 //import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+//import com.fasterxml.jackson.databind.module.SimpleModule;
 import nmg.softwareworks.jrpcagent.*;
 //import nmg.softwareworks.jrpcagent.JsonUtilities.JRPCObjectMapper;
 
@@ -28,7 +28,7 @@ public class BatchNotification  extends Notification{
 	//private final Connection connection;
 	//private BatchSubscription bs = null;
 	private final HashMap<Subscription<?>, Collection<?>> notifications =	new HashMap<>();
-	BatchNotification(){}
+	BatchNotification(){};
 	/*BatchNotification(String batchTag, ArrayNode matches, TriggerwareConnection connection){
 		//this.connection = connection;
 		//this.batchTag = batchTag;
@@ -63,7 +63,7 @@ public class BatchNotification  extends Notification{
 	public Map<Subscription<?>, Collection<?>> getNotifications(){return notifications;}
 	@Override
 	public void handle(Connection conn, String notificationTag) {
-		var bsub = (BatchSubscription) conn.getAgent().getNotificationInducer(notificationTag);
+		var bsub = (BatchSubscription)((TriggerwareClient)conn.getAgent()).getNotificationInducer(notificationTag);
 		if (bsub == null) {
 			Logging.log(String.format("internal error: received a batch subscription notification with an unknown tag %s", notificationTag));
 		} else 
@@ -80,14 +80,14 @@ public class BatchNotification  extends Notification{
                     {"label": "sub2", "tuples": [[3,4,"fum"],[4,5,"baz"]]}]} ...} 
              */
 	
-	static class DeserializationModule extends SimpleModule{
+	/*static class DeserializationModule extends SimpleModule{
 		//private final JRPCAgent agent;
 		DeserializationModule(TriggerwareConnection twConnection){
 			//this.agent = agent;
 			addDeserializer(BatchNotification.class, new BatchNotificationDeserializer(twConnection) );
 		}
-	}
-	private static class  BatchNotificationDeserializer extends StdDeserializer<BatchNotification> {
+	}*/
+	static class  BatchNotificationDeserializer extends StdDeserializer<BatchNotification> {
 		private final TriggerwareConnection twConnection;
 		BatchNotificationDeserializer(TriggerwareConnection connection) {
 	    	super(BatchNotification.class);  
@@ -96,9 +96,9 @@ public class BatchNotification  extends Notification{
 
 		@Override
 		public BatchNotification deserialize(JsonParser jParser, DeserializationContext ctxt)
-				throws IOException {
+				throws IOException, JsonProcessingException {
 			//should deserialize the params property value of a batch subscription notification
-			var mapper = twConnection.getObjectMapper();
+			var mapper = (ObjectMapper)jParser.getCodec();//twConnection.getPartnerMapper();
 			var token = jParser.nextToken();
 			if (token != JsonToken.START_OBJECT) {
 				var ignore = jParser.readValueAsTree();
@@ -115,10 +115,9 @@ public class BatchNotification  extends Notification{
 					return null;
 				}
 				switch(fieldname) {
-					case "update#": jParser.readValueAsTree();
-					case "matches":  
-						parseMatches(jParser, mapper, ctxt,  bn.notifications);
-					default: jParser.readValueAsTree();
+					case "update#" -> jParser.readValueAsTree();
+					case "matches" -> parseMatches(jParser, mapper, ctxt,  bn.notifications);
+					default -> jParser.readValueAsTree();
 				}
 			}
 			return bn;
@@ -153,14 +152,14 @@ public class BatchNotification  extends Notification{
 				MappingIterator<?> mi = null;
 				//var notificationsForSubscription = new ArrayList<SubscriptionNotification<?>>();
 				//JavaType tuplesType = null;
-				if (subscription.tupleClass != null)
-					mi = mapper.readValues(jParser, subscription.tupleClass);
+				if (subscription.rowClass != null)
+					mi = mapper.readValues(jParser, subscription.rowClass);
 					//tuplesType = tf.constructParametricType(ArrayList.class, (Class<?>) tupleType);
-				else if (subscription.tupleTypeRef != null)
+				/*else if (subscription.tupleTypeRef != null)
 					mi = mapper.readValues(jParser, subscription.tupleTypeRef);
 					//tuplesType = tf.constructParametricType(ArrayList.class, tf.constructType((TypeReference<?>) tupleType));
-				else 
-					mi = mapper.readValues(jParser, subscription.tupleJType);
+				*/ else 
+					mi = mapper.readValues(jParser, subscription.rowJType);
 					//tuplesType = tf.constructParametricType(ArrayList.class, (JavaType) tupleType);
 				var tuples = new ArrayList<Object>();
 				while (mi.hasNext()) {

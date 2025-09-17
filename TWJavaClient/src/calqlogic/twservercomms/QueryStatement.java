@@ -1,9 +1,16 @@
 package calqlogic.twservercomms;
 
-import java.util.ArrayList;
-
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.util.HashMap;
 
 import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import calqlogic.twservercomms.AbstractQuery.SignatureElement;
@@ -13,7 +20,7 @@ import nmg.softwareworks.jrpcagent.*;
 /**
  * A statement than can be used to issue query requests on a connection.
  * The statement may be executed {link #executeQuery} multiple times on the connection.
- * A QueryStatement may also be executed using {link #executeQueryWithPushResults} to have the rows 'streamed' back to
+ * A QueryStatement may also be executed using {link #executeQueryWithNotificationResults} to have the rows 'streamed' back to
  * the client on the connection.
  *
  */
@@ -28,18 +35,21 @@ public class QueryStatement implements Statement{
 	 * create a new query statement on a clients primary connection
 	 * @param client the client that will use this QueryStatement
 	 */
-	QueryStatement(TriggerwareClient client) {
+	protected QueryStatement(TriggerwareClient client) {
 		this(client.getPrimaryConnection());}
 
 	/**
 	 * create a new query statement
 	 * @param connection the connection on which the query will be issued.
 	 */
-	QueryStatement(TriggerwareConnection connection) {
+	protected QueryStatement(TriggerwareConnection connection) {
 		this.connection = connection;
 		this.typeFactory = connection.getTypeFactory();
-		this.fetchSize = connection.getAgent().getDefaultFetchSize();
+		this.fetchSize = ((TriggerwareClient)(connection.getAgent())).getDefaultFetchSize();
 	}
+	
+	//protected void setSignatureFree(boolean signatureFree) {this.signatureFree = signatureFree;}
+	public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {}
 
 	/** 
 	 * set the fetchSize  for executions of this QueryStatement.  The fetch size is the number of results to return in
@@ -54,39 +64,102 @@ public class QueryStatement implements Statement{
 	}
 
 	@JsonFormat(shape=JsonFormat.Shape.OBJECT)
-	static class Batch<T>{
-		private final long count;
-		private final ArrayList<T> rows;
-		private final boolean exhausted;
-		@JsonCreator 
-		public Batch(@JsonProperty("count") int count, @JsonProperty("tuples") ArrayList<T> rows,
-						@JsonProperty("exhausted")Boolean exhausted){
-			 this.count = count;
-			 this.rows = rows;
-			 if (exhausted != null)
-				 this.exhausted = exhausted;
-			 else this.exhausted = false;
-		 }
-		public long getCount() {return count;}
-		public ArrayList<T>getRows(){return rows;}
-		public boolean isExhausted() {return exhausted;}
-	}
-	@JsonFormat(shape=JsonFormat.Shape.OBJECT)
-	static class ExecuteQueryResult<T> {
-		private final Integer handle;
-		private final Batch<T> batch;
-		private final SignatureElement[]signature;
+	@JsonDeserialize(using = ResultSetResult.RSRDeserializer.class)
+	static class ResultSetResult<T> {
+		public Integer handle;
+		@JsonDeserialize(using = SignatureDeserializer.class)
+		public final SignatureElement[] rowSignature;
+		public final Batch<T> batch;
+		public Constructor<T> rowConstructor;
+		TWResultSet<T> resultSet;
 		Integer getHandle() {return handle;}
 		Batch<T>getBatch(){return batch;}
 		@JsonCreator 
-		public ExecuteQueryResult(@JsonProperty("handle") Integer handle, @JsonProperty("batch") Batch<T> batch,
-						@JsonProperty("signature")SignatureElement[]signature){
+		public ResultSetResult(@JsonProperty(value = "handle", required = false) Integer handle, @JsonProperty("signature")SignatureElement[] signature,
+						 @JsonProperty(value = "batch", required = false) Batch<T> batch){
 			 this.handle = handle;
 			 this.batch = batch;
-			 this.signature = signature;
+			 this.rowSignature = signature;
 		 }
-		public SignatureElement[]getSignature(){
-			return signature;}
+		SignatureElement[]getSignature(){ return rowSignature;}
+		Constructor<T> getRowConstructor(){return rowConstructor;}
+		void setResultSet(TWResultSet<T> resultSet) {this.resultSet = resultSet;}
+		TWResultSet<T> getResultSet() {return resultSet;};
+		void setRowConstructor(Constructor<T> rowConstructor) {this.rowConstructor = rowConstructor;}
+		
+		static class RSRDeserializer<T> extends JsonDeserializer<ResultSetResult<T>>{
+
+			@SuppressWarnings("unchecked")
+			@Override
+			public ResultSetResult<T> deserialize(JsonParser jParser, DeserializationContext ctxt)
+					throws IOException, JacksonException {
+				//var mapper = (ObjectMapper)jParser.getCodec();
+				var dsstate = (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+				var tkn = jParser.currentToken();
+				if (tkn != JsonToken.START_OBJECT) {
+					var whatIsIt = jParser.readValueAsTree();
+					throw new IOException(String.format("ad hoc query result not serialized as a json object <%s>", whatIsIt));
+				} else {
+					//tkn = jParser.nextToken();
+					Integer handle = null;
+					SignatureElement[]signature = null;
+					Batch<T>batch = null;
+					while (true) {//parse individual fields
+						var propertyName = jParser.nextFieldName();
+						if (propertyName==null) { 
+							tkn = jParser.currentToken();
+							if (tkn == JsonToken.END_OBJECT) break;
+							Logging.log("unexpected end of message on input stream");
+							throw new IOException("ad hoc query result not serialized properly");
+						}
+						jParser.nextToken(); // now at the token following the field name
+						switch (propertyName) {
+						case "handle" ->{
+							handle = jParser.readValueAs(Integer.class);
+							break;
+							}
+						case "signature" ->{
+							//temporary code
+							//var jsig = (ArrayNode)jParser.readValueAsTree();
+							//signature = SignatureElement.fromTree(jsig);
+							signature = jParser.readValueAs(SignatureElement[].class);
+							dsstate.put("rowSignature", signature);
+							}
+						case "batch" ->{
+							if (!dsstate.containsKey("rowSignature") && dsstate.containsKey("FOL")) {
+								dsstate.put("rowSignature", BatchRows.FOLSignature);}
+							ObjectMapper mapper = (ObjectMapper) jParser.getCodec();
+							batch = mapper.readValue(jParser,Batch.class);
+							break;
+							}
+						default ->{
+							@SuppressWarnings("unused")
+							var val = jParser.readValueAsTree();
+							throw new IOException(String.format("unexpected key <%s> in the result of an ad hoc query execution", propertyName));
+							}
+						}
+					}
+					return new ResultSetResult<T>(handle, signature, batch);
+				}
+			}
+		}
+	}
+
+	private static class SignatureDeserializer extends JsonDeserializer<SignatureElement[]> {
+		//this is just using the default deserialization, but adding the result to the deserialization state for use with 
+		//deserialization of the batch property that comes later
+		@Override
+		public SignatureElement[] deserialize(JsonParser jparser, DeserializationContext ctxt)
+				throws IOException, JacksonException {
+			//var sstate = (JRPCSerializationState)(ctxt.getAttribute("serializationState"));
+			var mapper = (ObjectMapper)jparser.getCodec();
+			SignatureElement[] sig = mapper.readValue(jparser, SignatureElement[].class);
+			@SuppressWarnings("unchecked")
+			var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+			dsstate.put("rowSignature", sig);
+			return sig;
+		}
+		
 	}
 	
 	/* from donc
@@ -109,50 +182,69 @@ optional:
 	 * When a timeout is exceeded on the server, the result set returned may contain fewer rows than requested.</li>
 	 * <li> a rowCountLimit, which is a limit on the <em>total</em> number of rows that will be returned in batches
 	 * before the TW server will regard the results as exhausted.  The default is NULL, meaning no limit is imposed 
-	 * by the QueryResourceLimits.  Even if a query executed by executeQuery has its own limit clause, the rowCountLimit
-	 * can further limit the number of 'row' values that will be returned. It cannot <em>extend</em> that limit, however.</li>
+	 * by the QueryResourceLimits.  
 	 * </ul>
 	 */
 	public static class QueryResourceLimits{
-		private Integer rowCountLimit = null;//, notifyRowCountLimit = null;
-		private Double timeout = null;//, notifyTimeout = null;
+		private Integer rowCountLimit = null;
+		private Double timeout = null;
 		/**
-		 //private  Class<?>[]  signatureTypes;  //private  String[] signatureNames, signatureTypeNames;
 		 * create a new QueryResourceLimits with default limits.
 		 * No timeout, and no limit on the number of row values to be returned.
 		 */
 		public QueryResourceLimits() {}
 		
 		/**
-		 * create a new QueryResourceLimits with specific limits.
-		 * @param timeout a timeout value
-		 * @param rowCountLimit  a limit on the number of row values to be returned
+		 * set the limit on the number of rows in the batch returned from a request
+		 * @param limit the limit to set 
+		 * @return this QueryResourceLimits instance
 		 */
-		public QueryResourceLimits(Double timeout, Integer rowCountLimit) {
-			setTimeout(timeout);
-			setRowCountLimit(rowCountLimit);
+		public QueryResourceLimits withLimit(Integer limit) {
+			if (limit != null && limit < 0)
+			  throw new IllegalArgumentException(
+					  "limit value passed to QueryResourceLimits.withLimit must be null or non-negative");
+			this.rowCountLimit = limit;
+			return this;
+		}
+		
+		/**
+		 * set the limit on the number of rows in the batch returned from a request
+		 * @param timeout  a limit (in seconds) of the amount of time to expend on finding results
+		 * @return this QueryResourceLimits instance
+		 */
+		public QueryResourceLimits withTimeLimit(Double timeout) {
+			if (timeout != null && timeout <= 0.0)
+			  throw new IllegalArgumentException(
+					  "limit value passed to QueryResourceLimits.withTimeLimit must be null or positive");
+			this.timeout = timeout;
+			return this;
 		}
 
 		public Integer getRowCountLimit() {return rowCountLimit;}
-		public void setRowCountLimit(Integer limit) {
-			if (limit != null && limit < 1)
-			  throw new IllegalArgumentException(
-					  "limit value passed to QueryResourceLimits.setRowCountLimit must be null or positive");		
-			rowCountLimit = limit;}
 		public Double getTimeout() {return timeout;}
-		/**
-		 * set the timeout resource limit
-		 * @param timeout null for no timeout, or a positive value.
-		 */
-		public void setTimeout(Double timeout) {
-			if (timeout != null && timeout <= 0.0)
-				throw new IllegalArgumentException(
-						"timeout value passed to QueryResourceLimits.setTimeout must be null or positive");
-			this.timeout = timeout;}
+	}
+	
+	private class AdHocQueryRequest<T> extends NamedParameterRequest<ResultSetResult<T>>{ // T is the row class
+		private final Constructor<T> rowConstructor;
+		@SuppressWarnings("unchecked")
+		AdHocQueryRequest(JavaType responseType, Class<?>rowClass){
+			super(responseType, /*null,*/ "execute-query",  null, null);
+			rowConstructor = (Constructor<T>) AbstractQuery.getRowConstructor(rowClass);
+		}
+		Constructor<T> getRowConstructor(){return rowConstructor;}
+		@Override
+		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
+			QueryStatement.this.establishResponseDeserializationAttributes(request,  response,  ctxt);
+			if (rowConstructor != null) {
+				@SuppressWarnings("unchecked")
+				var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+				dsstate.put("rowBeanConstructor", rowConstructor);
+			}
+		}
 	}
 	
 	/**
-	 * execute an ad-hoc SQL query, returning a resultset
+	 * execute an ad-hoc SQL query, returning a resultset 
 	 * Object[] is used as the row type, meaning that each row element in a result is deserialized from json using the default interpretation
 	 * as a Java object. No resource usage limits are imposed;all rows are returned in  the first resultset batch.
 	 * @param query  the SQL query string
@@ -161,44 +253,13 @@ optional:
 	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
 	 * @throws TriggerwareClientException if this QueryStatement is closed 
 	 */
-	public  TWResultSet<Object[]> executeQuery(String query,  String schema)
+	/*public  TWResultSet<Object[]> executeQuery(String query,  String schema)
 			throws JRPCException, TriggerwareClientException{
-		var qrl = fetchSize==null? null : new QueryResourceLimits(null, fetchSize);
+		var qrl = fetchSize==null? null : new QueryResourceLimits().withLimit(fetchSize);
 		return executeQuery(Object[].class, query, Language.SQL, schema, qrl);	
-	}
+	}*/
 	
-	/**
-	 * execute an ad-hoc SQL query, returning a resultset
-	 * No resource usage limits are imposed;all rows are returned in  the first resultset batch.
-	 * @param query  the SQL query string
-	 * @param schema the schema to use for resolving table and function names in the query string
-	 * @return a TWResultSet with the first batch of results from executing this PreparedQuery
-	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
-	 * @throws TriggerwareClientException if this QueryStatement is closed 
-	 */
-	public <T> TWResultSet<T> executeQuery(Class<T> rowType, String query,  String schema)
-			throws JRPCException, TriggerwareClientException{
-		var qrl = fetchSize==null? null : new QueryResourceLimits(null, fetchSize);
-		return executeQuery(rowType, query, Language.SQL, schema, qrl);	
-	}
-
-	/**
-	 * execute an ad-hoc query, returning a resultset
-	 * Object[] means that each row element in a result is deserialized from json using the default interpretation
-	 * as a Java object. The final argument null means that no resource usage limits are imposed, and all rows are returned in 
-	 * the first resultset batch.
-	 * @param query  the query string
-	 * @param schema the schema (sql) or package (fol) name to use for interpreting the query string
-	 * @param queryLanguage -- either Language.FOL or Language.SQL, as appropriate for the query
-	 * @return a TWResultSet with the first batch of results from executing this PreparedQuery
-	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
-	 * @throws TriggerwareClientException if this QueryStatement is closed 
-	 */
-	public  TWResultSet<Object[]> executeQuery(String query,  String queryLanguage, String schema)
-			throws JRPCException, TriggerwareClientException{
-		var qrl = fetchSize==null? null : new QueryResourceLimits(null, fetchSize);
-		return executeQuery(Object[].class, query, queryLanguage, schema, qrl);	
-	}
+	
 	
 	private void commonCheck() throws TriggerwareClientException {
 		if (closed) throw  new TriggerwareClientException("attempt to execute a closed QueryStatement");
@@ -208,57 +269,70 @@ optional:
 		}		
 	}
 	
-	private NamedRequestParameters commonParams(String query, String queryLanguage, String schema) {
-		return new NamedRequestParameters().with("query", query).with("language", queryLanguage).with("namespace", schema)
+	protected NamedRequestParameters commonParams(String query, String schema) {
+		return new NamedRequestParameters().with("query", query).with("language", Language.SQL).with("namespace", schema)
 				.with("check-update", false);
 	}
 
-	/**
+	/**execute an ad-hoc query.
+	 * Other executeQuery methods simple provide default values for one or more parameters of this method.
 	 * @param <T> the row type for the results
-	 * @param rowType the class of the row type
+	 * @param rowClass the class of the row type
 	 * @param query  the query string
-	 * @param queryLanguage  either Language.FOL or Language.SQL, as appropriate for the query
-	 * @param schema the schema (sql) or package (fol) name to use for interpreting the query string
+	 * @param schema the schema name to use for interpreting the query string
 	 * @param qrl resource limits on executing the query. null means no limits.
 	 * @return a TWResultSet with the first batch of results from executing this query
 	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
 	 * @throws TriggerwareClientException if this QueryStatement is closed
 	 */
-	@SuppressWarnings("unchecked")
-	public <T> TWResultSet<T> executeQuery(Class<T>rowType, String query, String queryLanguage, String schema, 
-			QueryResourceLimits qrl)	throws JRPCException, TriggerwareClientException{
+	public <T> TWResultSet<T> executeQuery(Class<T>rowClass, String query,  String schema, QueryResourceLimits qrl)
+				throws JRPCException, TriggerwareClientException{
 		commonCheck();
-		var jt = typeFactory.constructParametricType(QueryStatement.ExecuteQueryResult.class, rowType);
-		var params = commonParams(query, queryLanguage, schema);
-		if (qrl!=null) {
-			params.with("limit", qrl.rowCountLimit).with("timelimit", qrl.timeout);
-		} //else params.with("limit", Short.MAX_VALUE).with("timelimit", null);
-		ExecuteQueryResult<T> eqresult = null;
-		/*if (qrl != null && qrl.timeout != null) { //this is for the case that we aren't looking for 'partial success' from a request
-			var future = connection.asynchronousRPCN(jt, null, true, "execute-query",  params);
-			try {
-				eqresult = (ExecuteQueryResult<T>)JRPCAsyncRequest.executeWithTimeout(future, (long)(qrl.timeout*1000));
-			} catch (TimeoutException e) {
-				future.cancel(false); //that will cause the agent to ignore the eventual result.
-				throw new TimeoutException("client timeout  waiting for executeQuery result");
-			}catch (ExecutionException e) { // the request terminated by throwing an exception
-				var cause = e.getCause();
-				if (cause instanceof JRPCException) throw (JRPCException)cause;
-				if (cause instanceof TriggerwareClientException) throw (TriggerwareClientException)cause; // is that possible? maybe from deserializing
-				throw new JRPCException.InternalJRPCException(cause);
-			}catch(CancellationException e) {//this is a runtime exception in java
-				throw e;
-			}catch (InterruptedException  e) {
-				throw new JRPCException.InterruptionError(e);
-			}
-		}
-		else */
-			eqresult = connection.synchronousRPC(jt, null, null, "execute-query", params);
-		var rs = new TWResultSet<T>(rowType, this, fetchSize, eqresult,null);
+		var jt =  typeFactory.constructParametricType(QueryStatement.ResultSetResult.class, rowClass);
+		var eqNPR = new AdHocQueryRequest<T>(jt, rowClass);
+		var params = commonParams(query, schema);
+		if (qrl!=null) params.with("limit", qrl.rowCountLimit).with("timelimit", qrl.timeout);
+		var eqresult = (ResultSetResult<T>)connection.synchronousRPC(eqNPR, params);
+		eqresult.setRowConstructor(eqNPR.rowConstructor);
+		var rs = new TWResultSet<T>(eqNPR.rowConstructor, connection, eqresult.handle, fetchSize, eqresult.rowSignature, eqresult.batch.getRows());
+		eqresult.setResultSet(rs);
 		resultSet = rs;
 		return rs;
 	}
 	
+	/**
+	 * execute an ad-hoc SQL query, returning a resultset. The fetchsize of this QueryStatement is use as a rowCountLimit.
+	 * @param <T> the row type for the results
+	 * @param rowClass the row type for a row of results from this query
+	 * @param query  the query string
+	 * @param schema the schema name to use for interpreting the query string
+	 * @return a TWResultSet with the first batch of results from executing this ad hoc query
+	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
+	 * @throws TriggerwareClientException if this QueryStatement is closed 
+	 */
+	public  <T> TWResultSet<T> executeQuery(Class<T> rowClass, String query,  String schema)
+			throws JRPCException, TriggerwareClientException{
+		var qrl = fetchSize==null? null : new QueryResourceLimits().withLimit(fetchSize);
+		return executeQuery(rowClass, query, schema, qrl);	
+	}
+	
+	/**
+	 * execute an ad-hoc query, returning a resultset. The fetchsize of this querystatement is use as a rowCountLimit.
+	 * @param <T> the row type for the results
+	 * @param rowClass the row type for a row of results from this query
+	 * @param query  the query string
+	 * @param schema the schema  name to use for interpreting the query string
+	 * @param queryLanguage -- either Language.FOL or Language.SQL, as appropriate for the query
+	 * @return a TWResultSet with the first batch of results from executing this ad hoc query
+	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
+	 * @throws TriggerwareClientException if this QueryStatement is closed 
+	 */
+	/*<T> TWResultSet<T> executeQuery(Class<T> rowClass, String query,  String schema, String queryLanguage)
+			throws JRPCException, TriggerwareClientException{
+		var qrl = fetchSize==null? null : new QueryResourceLimits().withLimit(fetchSize);
+		return executeQuery(rowClass, query, schema, qrl);	
+	}*/
+
 	/*
 	- method - method to use in notifications
 	 - notify-limit - this many rows waiting to be reported   causes notification
@@ -267,28 +341,27 @@ optional:
 	 */
 	/**	 * 
 	 * @param <T> the row type for the results
-	 * @param rowType the class of the row type
+	 * @param rowClass the class of the row type
 	 * @param query  the query string
-	 * @param queryLanguage  either Language.FOL or Language.SQL, as appropriate for the query
-	 * @param schema the schema (sql) or package (fol) name to use for interpreting the query string
+	 * @param schema the schema name to use for interpreting the query string
 	 * @param controller controls that affect the timing/batching of results
 	 * @throws JRPCException a variety of problems -- communications, protocol, serialization/deserialization, or method-specific
 	 * @throws TriggerwareClientException if this QueryStatement is closed or if it is still executing some other query
 	 */
 	@SuppressWarnings("unchecked")
-	public <T> void executeQueryWithPushResults(Class<T>rowType, String query, String queryLanguage, String schema,
-												PushResultController<T> controller) 
-					throws TriggerwareClientException, JRPCException{
+	<T> void executeQueryWithNotificationResults(Class<T>rowClass, String query,  String schema,
+						NotificationResultController<T> controller) throws TriggerwareClientException, JRPCException{
 		commonCheck();
-		if (controller.getHandle()!=null)
-			throw  new TriggerwareClientException("using an open PushResultController with a new query.");
-		var jt = typeFactory.constructParametricType(QueryStatement.ExecuteQueryResult.class, rowType);
-		var eqParams = commonParams(query, queryLanguage, schema).with("limit", 0);
-		ExecuteQueryResult<T> eqresult = connection.synchronousRPC(jt, null, null,  "execute-query", eqParams);
-		controller.setHandle(connection, eqresult.handle); //that registers the handler
-		var nriParams = controller.getParams();
+		if (controller.getHandle() != null)
+			throw  new TriggerwareClientException("using an open NotificationResultController with a new query.");
+		var jt = typeFactory.constructParametricType(ResultSetResult.class, rowClass);
+		var eqParams = commonParams(query,schema).with("limit", 0);
+		Constructor<T> rowConstructor = AbstractQuery.getRowConstructor(rowClass);
+		var eqresult = (ResultSetResult<T>)connection.synchronousRPC(jt, /*null,*/  "execute-query", eqParams);//just get the resultset, but no rows
+		controller.setHandle(connection, eqresult.handle, eqresult.getSignature(), rowConstructor, eqresult.getResultSet()); //that registers the handler
 		//now start streaming
-		connection.synchronousRPC(Void.TYPE, null, null, "next-resultset-incremental", nriParams); //tell server to start streaming
+		var nriParams = controller.controlParams();
+		connection.synchronousRPC(Void.TYPE, /*null,*/ "next-resultset-incremental", nriParams); //tell server to start streaming
 	}
 
 	private boolean closed = false;

@@ -1,13 +1,13 @@
 package calqlogic.twservercomms;
 
-import java.util.Hashtable;
+import java.io.Closeable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import nmg.softwareworks.jrpcagent.JRPCException;
@@ -18,24 +18,15 @@ import nmg.softwareworks.jrpcagent.Logging;
  * In all cases, the handle is returned from some request on a connection, and the handle is only valid for requests
  * submitted on that connection.
  *
- * @param <T> the class that repesents a single 'row' of the answer to the query.
+ * @param <T> the type that repesents a single 'row' of the result of the query.
  */
-/**
- * @author Neil
- *
- * @param <T>
- */
-/**
- * 
- *
- * @param <T> the row type for the query result
- */
-public abstract class AbstractQuery<T> implements Cloneable{
+
+public abstract class AbstractQuery<T> implements Cloneable, Closeable{
 	
 
 	static class ReregistrationError extends JRPCException{
 		protected ReregistrationError () {
-			super("attempt to register an already registered query");	}
+			super(String.format("attempt to register an already registered query"));	}
 	}
 
 	protected Integer twHandle = null;
@@ -43,21 +34,22 @@ public abstract class AbstractQuery<T> implements Cloneable{
 	protected final String query, language, schema;
 	protected TriggerwareConnection connection = null;
 	protected TriggerwareClient getClient() {return  connection==null? null : connection.getClient();}
-	//protected final Class<T>rowType;
 	//two of these will be null
-	protected final Class<T> rowClass;
-	protected final TypeReference<T> rowTypeRef;
-	protected final JavaType rowJType;
+	protected final Class<T> rowClass; //rhis value is used to construct a jackson parametric type for deserializing rows
+	//protected final TypeReference<T> rowTypeRef;
+	//protected final JavaType rowJType;
+	protected final Constructor<T> rowConstructor;
 	
-	protected AbstractQuery (Object rowType, String query, String schema) {
-		this(rowType, query, Language.SQL, schema);}
+	protected AbstractQuery (Class<T> rowClass, String query, String schema) {
+		this(rowClass, query, Language.SQL, schema);}
 
-	@SuppressWarnings("unchecked")
-	protected AbstractQuery (Object rowType, String query, String language, String schema) {
+	protected AbstractQuery (Class<T> rowClass, String query, String language, String schema) {
 		this.query = query;
 		this.schema = schema;
 		this.language = language;
-		if (rowType instanceof Class<?>) {
+		this.rowClass = rowClass;
+		this.rowConstructor = getRowConstructor(rowClass);
+		/*if (rowType instanceof Class<?>) {
 			rowClass = (Class<T>) rowType;
 			rowTypeRef = null;
 			rowJType = null;
@@ -69,7 +61,7 @@ public abstract class AbstractQuery<T> implements Cloneable{
 			rowClass = null;
 			rowTypeRef = null;
 			rowJType = (JavaType) rowType;
-		} 
+		} */
 	}
 	
 	protected AbstractQuery(AbstractQuery<T> aq) { //copy constructor
@@ -77,8 +69,9 @@ public abstract class AbstractQuery<T> implements Cloneable{
 		this.schema = aq.schema;
 		this.language = aq.language;
 		this.rowClass = aq.rowClass;
-		this.rowTypeRef = aq.rowTypeRef;
-		this.rowJType = aq.rowJType;		
+		//this.rowTypeRef = aq.rowTypeRef;
+		//this.rowJType = aq.rowJType;
+		this.rowConstructor = aq.rowConstructor;
 	}
 	
 	protected void recordRegistration(TriggerwareConnection connection, int twHandle) {
@@ -86,7 +79,6 @@ public abstract class AbstractQuery<T> implements Cloneable{
 		this.twHandle = twHandle;
 	}
 	
-	abstract boolean closeQuery();
 	/**
 	 * @return the connection on which this query is used.
 	 */
@@ -101,40 +93,48 @@ public abstract class AbstractQuery<T> implements Cloneable{
 	public String getSchema() {return schema;}
 	protected Integer getHandle() {return twHandle;}
 	
-	JavaType parametricTypeFor(TriggerwareClient client, Class<?>genericClass) {
+	JavaType parametricTypeFor(/*TriggerwareClient client,*/ Class<?>genericClass) {
 		var tf = TypeFactory.defaultInstance();
-		return (rowClass != null) ? tf.constructParametricType(genericClass,  rowClass)
-									: tf.constructParametricType(genericClass, rowJType);
+		return tf.constructParametricType(genericClass,  rowClass);
 	}
-
-	final static Hashtable<String, Class<?>> columnClasses = new Hashtable<String, Class<?>>();
-	static {
-		columnClasses.put("double", Double.TYPE);
-		columnClasses.put("integer", Integer.TYPE);
-		columnClasses.put("number", Number.class);
-		columnClasses.put("boolean", Boolean.TYPE);
-		columnClasses.put("stringcase", String.class);
-		columnClasses.put("stringnocase", String.class);
-		columnClasses.put("stringagnostic", String.class);
-		columnClasses.put("date", java.time.LocalDate.class);
-		columnClasses.put("time", java.time.LocalTime.class);
-		columnClasses.put("timestamp", java.time.Instant.class);
-		columnClasses.put("interval", java.time.Duration.class);
-		columnClasses.put("", Object.class);
-		// TODO:     Blob
+	
+	@SuppressWarnings("unchecked")
+	static <T>Constructor<T> getRowConstructor(Class<T> rowClass){
+		if (rowClass ==  Object[].class) return null;
+		for (var con : rowClass.getConstructors()) {
+			if (con.isAnnotationPresent(DeserializationConstructor.class) && Modifier.isPublic(con.getModifiers()))
+				return (Constructor<T>)con;
+		}
+		return null;
 	}
-	static Class<?> classFromName(String className){
-		return columnClasses.get(className.toLowerCase());}
 
 	@JsonFormat(shape=JsonFormat.Shape.OBJECT)
 	static class SignatureElement{
 		final String name;
 		final String typeName;
-		@JsonCreator
-		SignatureElement(@JsonProperty("attribute")String name, @JsonProperty("type")String typeName){
+		@JsonIgnore
+		final Class<?> twSqlType;
+		//temporary
+		/*static SignatureElement[]fromTree(ArrayNode cols){
+			var sig = new SignatureElement[cols.size()];
+			var index=0;
+			for (var jcol : cols) {
+				var ocol = (ObjectNode)jcol;
+				sig[index++] = new SignatureElement(ocol.get("attribute").asText(), ocol.get("type").asText());
+			}
+			return sig;
+		}*/
+		/*@JsonCreator //is this ever used??
+		SignatureElement(@JsonProperty("attribute")String name, @JsonProperty("type")Class<?> twSqlType){
 			this.name = name;
-			//private  Class<?>[]  signatureTypes;  //private  String[] signatureNames, signatureTypeNames;
+			this.typeName = null;
+			this.twSqlType = twSqlType;
+			//Logging.log("col=%s type=%s",name,twSqlType);
+		}*/
+		public SignatureElement(@JsonProperty("attribute")String name, @JsonProperty("type")String typeName){
+			this.name = name;
 			this.typeName = typeName;
+			this.twSqlType = TWBuiltInTypes.classFromName(typeName);
 		}
 	}
 	
@@ -153,11 +153,12 @@ public abstract class AbstractQuery<T> implements Cloneable{
 		var result = new Class<?>[sig.length];
 		int index = 0;
 		for (var se : sig) {
-			var tp = classFromName(se.typeName);
+			var tp = se.twSqlType;//TWBuiltInTypes.classFromName(se.typeName);
 			result[index++] = tp;
 			if (tp == null) Logging.log("unknown type name from TW <%s>", se.typeName);
 		}
 		return result;
+		
 	}
 
 	static String[] typeSignatureTypeNames(SignatureElement[] sig){

@@ -1,21 +1,15 @@
 package calqlogic.twservercomms;
 
-
-import java.beans.DefaultPersistenceDelegate;
-import java.util.concurrent.TimeoutException;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-
+import calqlogic.twservercomms.Test.TestClient;
 import calqlogic.twservercomms.TriggerwareClient.TWRuntimeMeasure;
-import calqlogic.twservercomms.TriggerwareClient.TriggerwareClientException;
 import nmg.softwareworks.jrpcagent.JRPCException;
 import nmg.softwareworks.jrpcagent.Logging;
-import nmg.softwareworks.jrpcagent.NamedRequestParameters;
 
 class PerformanceTesting {
 	private interface TimeTestCode {
-	    void execute() throws Exception;
+	    public void execute() throws Exception;
 	}
 
 	static long[] measurementTime = null;
@@ -42,7 +36,8 @@ class PerformanceTesting {
 		return measured;		
 	}
 
-	private static long[] noopTimeTest(TriggerwareClient twClient, int n){
+	
+	static long[] noopTimeTest(TestClient twClient, int n){
 		long time=0,space=0;
 		for (int i = n; i>0; i--) {
 			long[] thisTime = timeTest(twClient, ()->{twClient.noop();});
@@ -74,10 +69,11 @@ class PerformanceTesting {
 	
 	private static PreparedQuery<?> testPreparedQuery = null;
 	private static long[] pqTimeTest(TriggerwareClient twClient) {
+		var pdecls = new PreparedQuery.NamedParameterDeclarations(); pdecls.put("col1Min", "integer"); pdecls.put("col2Max", "integer");
 		return timeTest(twClient, ()->{
 		  testPreparedQuery=
-				new PreparedQuery<IntegerPair>(IntegerPair.class, "SELECT * FROM r2test WHERE col1 >=:col1Min AND col2<=:col2Max", 
-						  "AP5", twClient.getPrimaryConnection());});
+				new PreparedQuery<IntegerPair>(twClient, IntegerPair.class, "SELECT * FROM r2test WHERE col1 >=:col1Min AND col2<=:col2Max", 
+						  "AP5", pdecls);});
 	}
 	
 	@JsonFormat(shape=JsonFormat.Shape.ARRAY)
@@ -89,21 +85,21 @@ class PerformanceTesting {
 		public int getSecond() {return second;}
 	}
 	
-	private static void debugTest(TriggerwareClient twClient) throws JRPCException, TriggerwareClientException {
+	/*private static void debugTest(TriggerwareClient twClient) throws JRPCException, TriggerwareClientException {
 		  var qs = twClient.createQuery();
 		  qs.setFetchSize(null);
 		  try (var rs = qs.executeQuery(IntegerPair.class, "SELECT * FROM r2test WHERE col1 >=11 AND col2<=15", "AP5")){
 			 int seen = 0;
 		     while (rs.next()) {
-		    	IntegerPair ip = rs.get(); 
+		    	IntegerPair ip = (IntegerPair)rs.get(); 
 		        seen++;
 		     }
 		     seen = seen;
-		  } catch (TimeoutException e) {
+		  } catch (Exception e) {
 		}
 		  
-		  PreparedQuery<IntegerPair>  pq= new PreparedQuery<>(IntegerPair.class, "SELECT * FROM r2test WHERE col1 >=:col1Min AND col2<=:col2Max", 
-				  "AP5", twClient);
+		  PreparedQuery<IntegerPair>  pq = new PreparedQuery<>(IntegerPair.class, "SELECT * FROM r2test WHERE col1 >=:col1Min AND col2<=:col2Max",
+				  "AP5",   twClient);
 		  pq.setFetchSize(null);
 		  pq.clearParameters();
 		  pq.setParameter("col1Min", 11);
@@ -116,7 +112,7 @@ class PerformanceTesting {
 		     }
 		     seen = seen;
 		  }catch(TimeoutException tex) {}
-	}
+	}*/
 	
 	private static long[] pqcTimeTest(TriggerwareClient twClient) {
 		return timeTest(twClient, ()->{testPreparedQuery.close();});}
@@ -128,7 +124,7 @@ class PerformanceTesting {
 				  pq.clearParameters();
 				  pq.setParameter("col1Min", c1min);
 				  pq.setParameter("col2Max", c2max);
-				  try (var rs = pq.executeQuery()){
+				  try (var rs = pq.createResultSet()){
 					 int seen = 0;
 				     while (rs.next()) {
 				    	var tuple=rs.get(); 
@@ -170,7 +166,7 @@ class PerformanceTesting {
 			new PositionalParameterRequest<Object[]>(Object[].class, false, "get-request-data", 0, 0);
 	static PositionalParameterRequest<Object[][]> poiRequest = 
 			new PositionalParameterRequest<Object[][]>(Object[][].class, false, "get-all-areas", 0, 0);*/
-	public static void testPreparedQuery(TriggerwareClient twClient) {//throws JRPCException, MiddlewareException, InterruptedException, ExecutionException {
+	public static void testPreparedQuery(TestClient twClient) {//throws JRPCException, MiddlewareException, InterruptedException, ExecutionException {
 		/*try{
 			var areas = twClient.execute(poiRequest);
 			areas = areas;

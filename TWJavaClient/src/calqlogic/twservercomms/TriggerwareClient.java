@@ -1,11 +1,7 @@
 package calqlogic.twservercomms;
 
-import static nmg.softwareworks.jrpcagent.JsonUtilities.*;
-
 import java.io.*;
 import java.net.*;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -14,46 +10,50 @@ import javax.net.ssl.SSLSocketFactory;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-//import com.sun.org.apache.xpath.internal.operations.VariableSafeAbsRef;
 import nmg.softwareworks.jrpcagent.*;
 import nmg.softwareworks.jrpcagent.JRPCException.JRPCClosedConnectionError;
 
 
 /**
  *<p>A TriggerwareClient is a {@link JRPCAgent} that provides one or more connections to a single Triggerware server.
- *The TriggerwareClient constructor establishes an initial connection to the TW server, whose identity is
- *determined by parameters of the constructor.
- *</p><p>TriggerwareClient contains methods for issuing a few specific requests that are supported by any Triggerware server.
+ *The TriggerwareClient constructor establishes an initial ('primary') connection to the TW server, whose identity is
+ *determined by host/port parameters of the constructor. This connection is special only in that many APIs in this library
+ *having a TriggerwareClient parameter need to access one of its connections.  These APIs use the primary connection.
+ *</p><p>
+ *TriggerwareClient contains methods for issuing  specific requests that are supported by any Triggerware server.
  *Classes that extend TriggerwareClient for specific applications will implement their own application-specific
- *methods to make requests that are idiosyncratic to a Triggerware server for that application.
+ *methods to make requests that are idiosyncratic to a Triggerware server for that application.  Any such requests must be
+ *implemented in lisp (the server's implementation langauge) and included in the server -- they cannot be added by a client.
  *</p><p>
  *A TriggerwareClient can also manage {@link Subscription Subscriptions}. By subscribing to certain kinds of changes, the
- *client arranges to be notified when these changes occur in the data accessible to the server.  
- *</p><p>The TW server implements a notion of <em>transaction</em>. Although this version of the TriggerwareClient
- *provides no means of performing a transaction, it is entirely possible that server code in some application will perform
- *them. A transaction could cause multiple notifications to be sent the client. Subscriptions can control whether these 
- *notifications will be handled sequentially or in a <em>batch</em> mode.
+ *client arranges to be notified when these changes occur in the data accessible to the server.  This capability also relies
+ *on natively implemented code that must be added to a Triggerware server.
  *</p>
- * @author nmg
  */
 public class TriggerwareClient extends JRPCAgent{
-	private static final SSLSocketFactory sslSocketFactory = 
+	/*static JsonMapper twMapper() {
+		var mapper = jsonMapper(new HashMap<String,Object>());
+		TemporalSerialization.configureForMapper(mapper);
+		//TWJson.configureForMapper(mapper);
+		mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+		return mapper;
+	}*/
+	private static SSLSocketFactory sslSocketFactory =
             (SSLSocketFactory)SSLSocketFactory.getDefault();
 	
 	private Integer defaultFetchSize = 10;
 
-	final static Map<String, TreeNode> serverAsynchronousMap = new HashMap<String, TreeNode>(1);
-	static {serverAsynchronousMap.put("asynchronous", BooleanNode.valueOf(true));}
+	//final static Map<String, TreeNode> serverAsynchronousMap = new HashMap<String, TreeNode>(1);
+	//static {serverAsynchronousMap.put("asynchronous", BooleanNode.valueOf(true));}
 
 	/**
 	 * tagCounter is used by Subscriptions and PolledQueries to ensure unique tags in notifications
 	 */
-	private static final AtomicInteger methodCounter = new AtomicInteger(1);
+	private static AtomicInteger methodCounter = new AtomicInteger(1);
 	static String nextNotificationMethod(String prefix) {
 		return prefix + methodCounter.getAndIncrement();}
 	
@@ -88,8 +88,6 @@ public class TriggerwareClient extends JRPCAgent{
 	 * TriggerwareClientException is the root class for exceptions that might be thrown by a TriggerwareClient
 	 * as a result of issuing a request to the server or handling a notification from the server.
 	 * A TriggerwareClientException is <em>not</em> a problem reported by the TW server.
-	 * @author nmg
-	 *
 	 */
 	public static class TriggerwareClientException extends Exception{ //should be abstract class, invent subclasses for actual errors
 		protected TriggerwareClientException(String msg) {	super(msg);	}
@@ -116,10 +114,8 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @param twServerPort the port number where the TW server is listening.
 	 * @throws IOException when a problem occurs establishing a connection to the designated host and port
 	 */
-	public TriggerwareClient(String name, InetAddress twHost, int twServerPort) 
-			throws IOException {
-		this(name, twHost, twServerPort, false);
-	}
+	public TriggerwareClient(String name, InetAddress twHost, int twServerPort) throws IOException {
+		this(name, twHost, twServerPort, false);}
 	
 	static final SSLSocket createSSLSocket(InetAddress host, int port) throws  IOException {
 		var sock = (SSLSocket)sslSocketFactory.createSocket(host, port);
@@ -132,16 +128,17 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @param name is a name for this client.  The name is used in log file entries. 
 	 * @param twHost the host where the TW server is listening. Null may be used to designate the loopback host.
 	 * @param twServerPort the port number where the TW server is listening.
-	 * @param useSSL make a connection that uses SSL for communicating over the socket
+	 * @param useSSL make a connection that uses SSL for communicating over the socket. This requires that the TW server listening
+	 * at the designated host/port expects encrypted traffic.
 	 * @throws IOException when a problem occurs establishing a connection to the designated host and port
 	 */
 	public TriggerwareClient(String name, InetAddress twHost, int twServerPort, boolean useSSL) 
 			throws IOException {
-		super(useSSL ? createSSLSocket(twHost, twServerPort) : new Socket(twHost, twServerPort));
+		super(useSSL ? createSSLSocket(twHost, twServerPort) : new Socket(twHost, twServerPort), name);
 		this.twHost = twHost;
 		this.twServerPort = twServerPort;
 		this.addOutboundProperties("asynchronous");
-		this.setName(name);
+		//this.setName(name);
 		this.useSSL = useSSL;
 		establishTWCommunications();
 		//getObjectMapper().registerModule(new BatchNotification.DeserializationModule(this));
@@ -156,7 +153,6 @@ public class TriggerwareClient extends JRPCAgent{
 	private synchronized void establishTWCommunications() throws IOException  {
 		if (tWCommsInitialized )return ;
 		try {
-			//setSqlCaseMode("case-insensitive");
 			setSqlDefaults(null, "case-insensitive");
 		} catch (JRPCException e) {
 			Logging.log(e, "failed to set sql case mode");}		 
@@ -174,9 +170,9 @@ public class TriggerwareClient extends JRPCAgent{
 	 * This method is <em>not</em> invoked when connections are closed by the client via shutdownTWCommunications.
 	 * @param connection -- the connection which is now closed.
 	 */
-	protected void onTWCommunicationsLost(Connection connection) {}
-
-    /**
+	protected void onTWCommunicationsLost(Connection connection) {};
+	
+	/**
 	 * @return <code>true</code> if communications with the TW server have been established, <code>false</code> otherwise.
 	 */
 	public boolean isTWCommunicationsInitialized() {return tWCommsInitialized;}
@@ -192,16 +188,9 @@ public class TriggerwareClient extends JRPCAgent{
 	@Override
 	public Connection connectToPartner(InputStream istream, OutputStream ostream) throws IOException {
 		return new TriggerwareConnection(this,  istream, ostream);}
-	
 
-	/*private static final MappingJsonFactory mjfactory = new MappingJsonFactory();
-	public void serialize(Object v, OutputStream s) throws IOException {
-		var gen = mjfactory.createGenerator(s);
-		getObjectMapper().writeValue(gen, v);
-	}*/
-	
-	//public JRPCObjectMapper getObjectMapper() {return primaryConnection.getObjectMapper();}
-	JRPCObjectMapper getObjectMapper(Connection conn) {return conn.getObjectMapper();}
+	JsonMapper getObjectMapper(Connection conn) {return conn.getPartnerMapper();}
+
 	/**
 	 * Activate a subscription for individual notifications on this client's primary connection
 	 * @param subscription the subscription to activate
@@ -252,9 +241,10 @@ public class TriggerwareClient extends JRPCAgent{
 	 */
 	/*public void activate(BatchSubscription subscription) throws JRPCException, SubscriptionException {
 		subscription.activate(getPrimaryConnection());}*/
+	
 	/**
 	 * Activate a subscription for batch notifications on one of this client's connections
-	 //* @throws SubscriptionException if the client
+	 * @throws SubscriptionException if the client
 	 * <ul>
 	 * <li> already has this subscription active on a different connection</li>
 	 * <li> is requesting batch notifications when already subscribed for individual notifications</li>
@@ -269,29 +259,8 @@ public class TriggerwareClient extends JRPCAgent{
 		subscription.activate(connection);
 	}*/
 
-
-
-	/*private HashMap<String, Subscription<?>> mySubscriptions = new HashMap< String, Subscription<?>>();
-	Subscription<?> getSubscriptionFromTag(String notificationTag) {
-		return mySubscriptions.get(notificationTag);	}
-	Subscription<?> registerSubscriptionTag(String tag, Subscription<?>s){
-		return mySubscriptions.put(tag, s);}
-	Subscription<?> unregisterSubscriptionTag(String tag){
-		return mySubscriptions.remove(tag);}*/
-
-	
-	
-
-	// the noop and runtime requests are  useful for performance testing
-	private static final PositionalParameterRequest<Void> noopRequest = 
-			new PositionalParameterRequest<Void>(Void.TYPE, null, "noop", 0, 0);	
-	public void noop()throws JRPCException {
-		noopRequest.execute(primaryConnection);	}
-
 	/**
 	 * TWRuntimeMeasure allows a client to perform limited measurement of time/space performance in the TW server
-	 * @author nmg
-	 *
 	 */
 	@JsonFormat(shape=JsonFormat.Shape.ARRAY)
 	@JsonPropertyOrder({ "runTime",  "gcTime", "bytes" }) 
@@ -301,8 +270,8 @@ public class TriggerwareClient extends JRPCAgent{
 		public long bytes;
 	}
 	final double serverTimeUnitsPerSecond = Math.pow(10, 6); // that is for a linux clisp twserver
-	private static final PositionalParameterRequest<TWRuntimeMeasure> runtimeRequest = 
-			new PositionalParameterRequest<TWRuntimeMeasure>(TWRuntimeMeasure.class, null, "runtime", 0, 0);
+	private static PositionalParameterRequest<TWRuntimeMeasure> runtimeRequest = 
+			new PositionalParameterRequest<TWRuntimeMeasure>(TWRuntimeMeasure.class,  "runtime", 0, 0);
 	/**
 	 * Issue a request on this client's primary connection to obtain a time/space consumption measurement from the TW server.
 	 * @return the current TWRuntimeMeasure reported by the TW server.
@@ -314,12 +283,9 @@ public class TriggerwareClient extends JRPCAgent{
 		return runtimeRequest.execute(c);
 	}*/
 	
-	/*static PositionalParameterRequest<Void>setSqlCaseModeRequest =
-			new PositionalParameterRequest<Void>(Void.TYPE, null, "set sql mode", 1, 1);
-	public Void setSqlCaseMode(String mode) throws JRPCException {
-		return 	setSqlCaseModeRequest.execute(primaryConnection, mode);}*/
+
 	static NamedParameterRequest<Void> setSqlDefaultsRequest =
-			new NamedParameterRequest<Void>(Void.TYPE, null, "set-global-default",
+			new NamedParameterRequest<Void>(Void.TYPE, /*null,*/ "set-global-default",
 					null, new String[] {"language", "sql-mode", "sql-namespace"});
 	public void setSqlDefaults(String schema, String mode) throws JRPCException {
 		var params = new NamedRequestParameters();
@@ -327,22 +293,23 @@ public class TriggerwareClient extends JRPCAgent{
 		if (schema != null) params.with("sql-namespace", schema);
 		setSqlDefaultsRequest.execute(primaryConnection, params);}
 	
-	static PositionalParameterRequest<String> validationRequest = 
-			new PositionalParameterRequest<String>(String.class, null, "validate", 4, 4);
+	//Movedto SCM
+	/*static PositionalParameterRequest<String> validationRequest = 
+			new PositionalParameterRequest<String>(String.class,  "validate", 4, 4);
 	
 	public String validate(String query, String lang, String schema, boolean twoState) throws JRPCException {
 		return validationRequest.execute(primaryConnection, query, lang, schema, twoState);	}
 	
+	
 	static NamedParameterRequest<String> paraphraseRequest = 
-			new NamedParameterRequest<String>(String.class, null, "paraphrase", 
-					new String[] {"query"}, new String[] {"lang", "schema"});
+			new NamedParameterRequest<String>(String.class,  "paraphrase", new String[] {"query"}, new String[] {"lang", "schema"});
 	public String paraphrase(String query,  String schema) throws JRPCException {
 		var params = new NamedRequestParameters();
 		params.with("query", query);
 		params.with("lang", "sql");
 		if (schema != null) params.with("schema", schema);
 		return 	paraphraseRequest.execute(primaryConnection, params);
-	}
+	}*/
 	
 	//TODO: do not use the "askquery" server api
 	// reimplement this to use QueryStatement
@@ -355,61 +322,13 @@ public class TriggerwareClient extends JRPCAgent{
 					new String[] {"timelimit", "resultlimit", "url-accesslimit", "url-cached-limit", "cachelimits", "progress",
 							      "twoState"});
 	*/
-	/**
-	 * send a query to the TW server on the client's primary connection.
-	 * @param <T> the tuple type of the result of this query
-	 * @param classz  the tuple type of the result of this query
-	 * @param parameters  
-	 * <ul>
-	 * <li> query -- the string encoding the query. This is required.</li>
-	 * <li> lang -- one of the {@link Language} constants.  This is required.</li>
-	 * <li> schema -- the default schema for interpreting the query.  This is required.</li>
-	 * <li> timelimit -- a number.  This is optional. If omitted, the server uses 30. Maximum time (in seconds)
-	 * that the server will devote to answering the query.  This is <em>elapsed</em> time.
-	 * <li> resultlimit -- a number. This is optional. If omitted, the server uses 50. This is an upper bound on the
-	 * number of instances of T the server will return in the QueryResponse.
-	 * </ul>
-	 * Other optional parameters are accepted. Consult the TW server documentation for their names and interpretations.
-	 * @return A new QueryResponse containing the result of the query
-	 * @throws JRPCException if the server rejects the query for any reason
-	 */
-	/*@SuppressWarnings("unchecked")
-	<T> QueryResponse<T> askQuery (NamedRequestParameters parameters, Class<T>classz) throws JRPCException {
-		return askQueryRequest.execute(primaryConnection, parameters);
-	}*/
-
-	//delete query is a holdover from a time when the TW server was persisting queries
-	/*static NamedParameterRequest<String> deleteQueryRequest = 
-			new NamedParameterRequest<String>(String.class, null, "delete-query", null,  null);
-	public String deleteQuery (NamedRequestParameters parms) throws JRPCException {
-		return deleteQueryRequest.execute(primaryConnection, parms);	}*/
 
 
 	static NamedParameterRequest<String> deletePolledQueryRequest = 
-			new NamedParameterRequest<String>(String.class, null, "delete-polled-query", null,  null);
+			new NamedParameterRequest<String>(String.class, /*null,*/ "delete-polled-query", null,  null);
 	public String deletePolledQuery (NamedRequestParameters parms) throws JRPCException {
 		return deletePolledQueryRequest.execute(primaryConnection, parms);	}
 
-/*	
-	//save-query is the old persistence mechanism inside the tw server
-	static NamedParameterRequest<String> saveQueryRequest = 
-			new NamedParameterRequest<String>(String.class, null, "save-query", null, null);
-	public String saveQuery (NamedRequestParameters parms) throws JRPCException {
-		return saveQueryRequest.execute(primaryConnection, parms);}
-*/
-	//savedqueries2015 is the old persistence mechanism inside the tw server
-	/*static NamedParameterRequest<ArrayNode> getSavedQueriesRequest = 
-			new NamedParameterRequest<ArrayNode>(ArrayNode.class, null, "savedqueries2015", null,  null);
-	public ArrayNode getSavedQueries (NamedRequestParameters parms) throws JRPCException {
-		return getSavedQueriesRequest.execute(primaryConnection, parms);	}*/
-
-	
-	static NamedParameterRequest<String> prettyPrintRequest = 
-			new NamedParameterRequest<String>(String.class, null, "pretty-print",
-					new String[] {"query", "lang", "schema"}, new String[] {"twoState"});
-	public String prettyPrint (String sexp, String language, String schema) throws JRPCException {
-		var params = new NamedRequestParameters(). with("query", sexp) .with ("language", language) .with("namespace", schema);
-		return prettyPrintRequest.execute(primaryConnection, params);	}
 	
 	/**
 	 * create a QueryStatement for use on this client's primary connection
@@ -424,50 +343,40 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @return a new QueryStatement
 	*/
 	public QueryStatement createQuery(TriggerwareConnection connection){
-		//var c = checkConnectionValid(connection);
 		return new QueryStatement(connection);	}
 
-	public <T> T synchronousRPCP(Class<T>classz, String method, Object ...params) throws  JRPCException {
-		return primaryConnection.synchronousRPC(null, classz, null, null, method, params);}
-	public <T> T synchronousRPCP(Class<T>classz, T resultInstance, boolean serverAsynchronous, String method, Object ...params) throws  JRPCException {
-		return primaryConnection.synchronousRPC(null, classz, resultInstance, serverAsynchronous?serverAsynchronousMap : null, method, params);}
+	public <T> T synchronousRPCP(Class<T>classz,  String method, Object ...params) throws  JRPCException {
+		return synchronousRPCP(primaryConnection, classz, /*null,*/ /*null,*/ method, params);}
 	
-	public <T> T synchronousRPCP(Connection connection, Class<T>classz, boolean serverAsynchronous, String method,
-				Object ...params) throws  JRPCException {
-		//var c = checkConnectionValid(connection);
-		return connection.synchronousRPC(null, classz, null, serverAsynchronous?serverAsynchronousMap : null, method, params);}
-	public <T> T synchronousRPCP(Connection connection, Class<T>classz,  T resultInstance, boolean serverAsynchronous, 
+	public <T> T synchronousRPCP(Connection connection, Class<T>classz, String method, Object ...params) throws  JRPCException {
+		return connection.synchronousRPC(classz, /*null,*/ method, params);}
+	/*public <T> T synchronousRPCP(Connection connection, Class<T>classz,   T resultInstance, boolean serverAsynchronous, 
 			String method, Object ...params) 	throws  JRPCException {
 		//var c = checkConnectionValid(connection);
-		return connection.synchronousRPC(null, classz, resultInstance, serverAsynchronous?serverAsynchronousMap : null, method, params);}
+		return connection.synchronousRPC(null, classz,  resultInstance, serverAsynchronous?serverAsynchronousMap : null, method, params);}*/
 		
 
-	public <T> T synchronousRPC(Class<T>classz, String method, NamedRequestParameters params) throws JRPCException {
-		return primaryConnection.synchronousRPC(null,classz, null, null, method, params);	}
-	public <T> T synchronousRPCN(Class<T>classz, T resultInstance, boolean serverAsynchronous, String method, 
-			NamedRequestParameters params) throws JRPCException {
-		return primaryConnection.synchronousRPC(null,classz, resultInstance, serverAsynchronous?serverAsynchronousMap:null, method, params);	}
-	public <T> T synchronousRPCN(Connection connection, Class<T>classz,  boolean serverAsynchronous, String method, 
-			NamedRequestParameters params) throws JRPCException {
-		//var c = checkConnectionValid(connection);
-		return connection.synchronousRPC(null,classz, null, serverAsynchronous?serverAsynchronousMap : null, method, params);	}
+	public <T> T synchronousRPCN(Class<T>classz, String method, NamedRequestParameters params) throws JRPCException {
+		return synchronousRPCN(primaryConnection, classz,  /*null,*/ method, params);	}
+	/*public <T> T synchronousRPCN(Connection conn, Class<T>classz,  String method, NamedRequestParameters params) throws JRPCException {
+		return conn.synchronousRPC(classz, method, params);	}*/
 	/**
-	 * Issue a client-synchronous request to this clients TW server, providing all the data needed to issue a request.
+	 * Issue a client-synchronous request to this client's TW server, providing all the data needed to issue a request.
 	 * @param <T> the result type
 	 * @param connection the connection on which to issue the request
-	 * @param serverAsynchronous <code>true</code> if the request should be handled asynchronously on the server,
-	 * otherwise <code>false</code>
 	 * @param method the json rpc method name for the request
 	 * @param classz the result type
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
 	 * @param params the parameters for the request
 	 * @return the result of the request
 	 * @throws JRPCException if the server responds with an exception
 	 */
-	public <T> T synchronousRPCN(Connection connection, Class<T>classz,  T resultInstance, boolean serverAsynchronous, 
+	public <T> T synchronousRPCN(Connection connection, Class<T>classz, String method, 
+			NamedRequestParameters params) throws JRPCException {
+		return connection.synchronousRPC(classz, /*null,*/ method, params);	}
+	/*public <T> T synchronousRPCN(Connection connection, Class<T>classz, T resultInstance, boolean serverAsynchronous, 
 			String method, NamedRequestParameters params) throws JRPCException {
 		//var c = checkConnectionValid(connection);
-		return connection.synchronousRPC(null,classz, resultInstance, serverAsynchronous?serverAsynchronousMap : null, method, params);	}
+		return connection.synchronousRPC(null,classz, resultInstance, serverAsynchronous?serverAsynchronousMap : null, method, params);	}*/
 	
 	/**
 	 * Issue a client-asynchronous, server-synchronous request to this clients TW server using this client's primary connection, 
@@ -491,58 +400,50 @@ public class TriggerwareClient extends JRPCAgent{
 	 * Issue a client-asynchronous, server-synchronous request to this client's TW server using this client's primary connection.
 	 * @param <T> the type of the result from this request 
 	 * @param method the json rpc method name for the request
-	 * @param classz the result type
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
+	 * @param resultType the result type
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if this clients primary connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCP(String method, Class<T>classz, T resultInstance, Object ...params) 
+	/*public <T> CompletableFuture<T> asynchronousRPCP(String method, Class<T>classz, T resultInstance, Object ...params) 
 			throws JRPCClosedConnectionError {
 		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest(this, true, null, classz, resultInstance, method, params);
 		return primaryConnection.asynchronousRPC(jrpcRequest);
-	}
-	public <T> CompletableFuture<T> asynchronousRPCP(String method, TypeReference<T>resultType, T resultInstance, Object ...params)
+	}*/
+	public <T> CompletableFuture<T> asynchronousRPCP(String method, TypeReference<T>resultType, Object ...params)
 			throws JRPCClosedConnectionError {
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest(this, true, null, resultType, resultInstance, method, params);
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(this, true, /*null*/ resultType, method, params);
+					      new JRPCAsyncRequest<T>(resultType, method, params);
 		return primaryConnection.asynchronousRPC(jrpcRequest);
 	}
 	/**
 	 * Issue a client-asynchronous request to this clients TW server, creating a new object for the result.
 	 * This is the same as
-	 * asynchronousRPCP(connection, serverAsynchronous, method, classz,	null, params)
+	 * asynchronousRPCP(connection,  method, classz, params)
 	 * @param <T> the type of the result from this request
 	 * @param connection the connection on which to issue the request
-	 * @param serverAsynchronous <code>true</code> if the request should be handled asynchronously on the server,
-	 * otherwise <code>false</code>
 	 * @param method the json rpc method name for the request
 	 * @param classz the result type
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if the connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, boolean serverAsynchronous, String method, 
-			Class<T>classz, Object ...params) throws JRPCClosedConnectionError {
-		return asynchronousRPCP(connection, serverAsynchronous, method, classz,	null, params);}
+	/*public <T> CompletableFuture<T> asynchronousRPCP(Connection connection,  String method, Class<T>classz, Object ...params) 
+			throws JRPCClosedConnectionError {
+		return asynchronousRPCP(connection,  method, classz, null, params);}*/
 
 	/**
 	 * Issue a client-asynchronous request to this clients TW server, providing all the data needed to issue a request.
 	 * @param <T> the result type
 	 * @param connection the connection on which to issue the request
-	 * @param serverAsynchronous <code>true</code> if the request should be handled asynchronously on the server,
-	 * otherwise <code>false</code>
-	 * @param method the json rpc method name for the request
+	* @param method the json rpc method name for the request
 	 * @param classz the result type
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if the connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, boolean serverAsynchronous, String method, 
-			Class<T>classz,	T resultInstance, Object ...params) throws JRPCClosedConnectionError {
-		//checkConnectionValid(connection);
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest(this, true, serverAsynchronous?serverAsynchronousMap : null, classz, resultInstance, 
-															  method, params);
+	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, String method, Class<T>classz, Object ...params) throws JRPCClosedConnectionError {
+		var jrpcRequest = new JRPCAsyncRequest<T>(classz, method, params); //(JRPCAsyncRequest<T>)createRequest(this, true,  /*null,*/ classz,  method, params);
 		return connection.asynchronousRPC(jrpcRequest);
 	}
 
@@ -550,20 +451,16 @@ public class TriggerwareClient extends JRPCAgent{
 	 * Issue a client-asynchronous request to this clients TW server, providing all the data needed to issue a request.
 	 * @param <T> the result type
 	 * @param connection the connection on which to issue the request
-	 * @param serverAsynchronous <code>true</code> if the request should be handled asynchronously on the server,
-	 * otherwise <code>false</code>
 	 * @param method the json rpc method name for the request
-	 * @param typeRef the result type
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
+	 * @param resultType the result type
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if the connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, boolean serverAsynchronous, String method, 
-			TypeReference<T>typeRef, T resultInstance, Object ...params) throws JRPCClosedConnectionError {
-		//checkConnectionValid(connection);
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest( this, true, serverAsynchronous?serverAsynchronousMap : null, typeRef, resultInstance, 
-															  method, params);
+	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, String method, 
+			TypeReference<T>resultType, /*T resultInstance,*/ Object ...params) throws JRPCClosedConnectionError {
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest( this, true, /*null,*/ resultType,  method, params);
+						  new JRPCAsyncRequest<T>(resultType, method, params);
 		return connection.asynchronousRPC(jrpcRequest);
 	}
 
@@ -580,7 +477,7 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @throws JRPCClosedConnectionError if this client's primary connection is closed
 	 */
 	public <T> CompletableFuture<T> asynchronousRPCN(String method, Class<T>classz, NamedRequestParameters params) throws JRPCClosedConnectionError {
-		return asynchronousRPCN(method, classz, null, params);}
+		return asynchronousRPCN(method, classz,  params);}
 
 	/**
 	 * Issue a client-asynchronous/server-asynchronous request to this clients TW server. Use this client's primary connection.
@@ -588,30 +485,29 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @param <T> the result type
 	 * @param method the json rpc method name for the request
 	 * @param classz the result type
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if this client's primary connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCN(String method, Class<T>classz, T resultInstance,
+	/*public <T> CompletableFuture<T> asynchronousRPCN(String method, Class<T>classz,  T resultInstance,
 			NamedRequestParameters params) throws JRPCClosedConnectionError {
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest( this, true, serverAsynchronousMap, classz, resultInstance, method, params);
+		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest(this, true, serverAsynchronousMap, classz,  resultInstance, method, params);
 		return primaryConnection.asynchronousRPC(jrpcRequest);
-	}
+	}*/
 	/**
 	 * Issue a client-asynchronous/server-asynchronous request to this clients TW server. Use this client's primary connection.
 	 * The request will be issued on this client's primary connection.
 	 * @param <T> the result type
 	 * @param method the json rpc method name for the request
 	 * @param resultType the result type
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if this client's primary connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCN(String method, TypeReference<T>resultType, T resultInstance,
+	public <T> CompletableFuture<T> asynchronousRPCN(String method, TypeReference<T>resultType, //T resultInstance,
 			NamedRequestParameters params) throws JRPCClosedConnectionError {
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest( this, true, TriggerwareClient.serverAsynchronousMap, resultType, resultInstance, method, params);
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(resultType, method, params);
+						  new JRPCAsyncRequest<T>(resultType, method, params);
 		return primaryConnection.asynchronousRPC(jrpcRequest);
 	}
 
@@ -631,7 +527,7 @@ public class TriggerwareClient extends JRPCAgent{
 	 */
 	public <T> CompletableFuture<T> asynchronousRPCN(Connection connection, boolean serverAsynchronous, String method,
 			Class<T>classz, NamedRequestParameters params) 	throws JRPCException {
-		return asynchronousRPCN(connection, serverAsynchronous, method, classz, null, params);}
+		return asynchronousRPCN(connection, serverAsynchronous, method, classz,  params);}
 
 	/**
 	 * Issue a client-asynchronous request to this clients TW server, providing all the data needed to issue a request.
@@ -646,30 +542,28 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if the connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCN(Connection connection, boolean serverAsynchronous, String method, Class<T>classz, 
-			T resultInstance,  NamedRequestParameters params) throws  JRPCClosedConnectionError {
+	/*public <T> CompletableFuture<T> asynchronousRPCN(Connection connection, boolean serverAsynchronous, String method, Class<T>classz, 
+			 T resultInstance,  NamedRequestParameters params) throws  JRPCClosedConnectionError {
 		//checkConnectionValid(connection);
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest( this, true, serverAsynchronous?serverAsynchronousMap:null,  classz, resultInstance, method, params);
+		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest( this, true, serverAsynchronous?serverAsynchronousMap:null,  classz,
+				resultInstance, method, params);
 		return connection.asynchronousRPC(jrpcRequest);
-	}
+	}*/
 	/**
 	 * Issue a client-asynchronous request to this clients TW server, providing all the data needed to issue a request.
 	 * @param <T> the request's result type
 	 * @param connection the connection on which to issue the request
-	 * @param serverAsynchronous <code>true</code> if the request should be handled asynchronously on the server,
-	 * otherwise <code>false</code>
 	 * @param method the json rpc method name for the request
 	 * @param resultType the result type for this request
-	 * @param resultInstance an instance of the result type for deserializing into, or null to create a new instance
 	 * @param params the parameters for the request
 	 * @return a future for obtaining result of the request
 	 * @throws JRPCClosedConnectionError if the connection is closed
 	 */
-	public <T> CompletableFuture<T> asynchronousRPCN(Connection connection, boolean serverAsynchronous, String method, 
-			TypeReference<T>resultType, T resultInstance, 
-            NamedRequestParameters params) throws JRPCClosedConnectionError {
+	public <T> CompletableFuture<T> asynchronousRPCN(Connection connection, //boolean serverAsynchronous,  
+			TypeReference<T>resultType, String method, NamedRequestParameters params) throws JRPCClosedConnectionError {
 		//checkConnectionValid(connection);
-		var jrpcRequest = (JRPCAsyncRequest<T>)createRequest(this, true, serverAsynchronous? serverAsynchronousMap: null, resultType, resultInstance, method, params);
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(this, true, /*null,*/ resultType, method, params);
+						  new JRPCAsyncRequest<T>(resultType, method, params);
 		return connection.asynchronousRPC(jrpcRequest);
 	}
 

@@ -5,11 +5,12 @@ import java.util.HashSet;
 import calqlogic.twservercomms.Subscription.SubscriptionException;
 import nmg.softwareworks.jrpcagent.JRPCException;
 import nmg.softwareworks.jrpcagent.NotificationInducer;
+import nmg.softwareworks.jrpcagent.SerializationState;
 
 /**
  * <p>In the TW server, changes to data can occur as part of transactions (see TW server documentation). The states of the data
  * prior to and following a transaction are the states referenced by the two-state condition of a Subscription.  It is possible
- * (in many applications it will be common) that the condition of a Subscription will be satisfied for multiple tuples of data
+ * (in many applications it will be common) that the condition of a Subscription will be satisfied for multiple rows of data
  * across a single transaction, and/or that the conditions of <em>multiple</em> Susbscriptions will be satisfied across a single
  * transaction.
  * </p><p>
@@ -100,9 +101,9 @@ public class BatchSubscription implements NotificationInducer{
 			subscription.registerWithTW(subscribedOn);
 	}
 	
-	public void activate(TriggerwareClient client) throws JRPCException {
+	public void activate(TriggerwareClient client) throws SubscriptionException, JRPCException {
 		activate(client.getPrimaryConnection());}
-	public synchronized void activate(TriggerwareConnection connection) throws JRPCException {
+	public synchronized void activate(TriggerwareConnection connection) throws SubscriptionException, JRPCException {
 		if (subscribedOn != null) {
 			if (subscribedOn == connection) return; //noop
 			throw new SubscriptionException("attempt to activate a batch subscription on a second connection");
@@ -139,11 +140,18 @@ public class BatchSubscription implements NotificationInducer{
 	public void handleNotification(BatchNotification batch) {
 		for (var subBatch :batch.getNotifications().entrySet()) {
 			var sub = subBatch.getKey();
-			var tuples = subBatch.getValue(); //ArrayList of tuple deserializations
-			sub.handleBatchNotifications(tuples);
+			var rows = subBatch.getValue(); //ArrayList of row deserializations
+			sub.handleBatchNotifications(rows);
 		}		
 	}
 
+
 	@Override
-	public boolean isClosed() {		return false;	}
+	public void establishDeserializationAttributes(SerializationState ss) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/*@Override
+	public boolean isClosed() {return false;}*/
 }

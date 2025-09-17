@@ -2,6 +2,9 @@ package calqlogic.twservercomms;
 
 import java.util.TimeZone;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+
 /**
  * A PolledQueryCalendarSchedule defines a calendar based schedule used to run a polled query.
  * It contains 'filtering' fields for minutes, hours, days, months, and weekdays.
@@ -10,7 +13,7 @@ import java.util.TimeZone;
  * A timestamp is considered to be in the schedule if all 5 pieces of the timestamp satisfy the
  * corresponding filtering field of the schedule.
  * 
- * The schedule is passed to the tw server when a PolledQueryCalendarScheduledQuery is registered with the TW server.
+ * The schedule is passed to the tw server when a ScheduledQuery is registered with the TW server.
  * The query is polled at the times specified by the filters in the specified timezone.  The timezone is specified as a string.
  * The strings allowed are the timezone names in IANA timezone database.  The string "UTC" is also allowed if you want to use UTC
  * rather than an actual timezone for a calendar schedule.
@@ -197,5 +200,26 @@ public class PolledQueryCalendarSchedule implements PolledQuerySchedule {
 								String.format("%s is in invalid range", spec), null);
 				}
 		}
-	}	
+	}
+	
+	/*
+	 (make-instance 'scheduling:calendar-schedule
+	      :minutes (decode-time-unit-string json "minutes" "0" 0 59)
+	      :hours (decode-time-unit-string json "hours" "0" 0 23)
+	      :days (decode-time-unit-string json "days" "*" 1 31)
+	      :months (decode-time-unit-string json "months" "*" 1 12)
+	      :weekdays (decode-time-unit-string json "weekdays" "*" 0 6)
+	      :timezone tzone)
+	 */
+	@Override
+	public JsonNode asJson() {
+		var jo = JsonNodeFactory.instance.objectNode();
+		if (minutes != "0") jo.put("minutes", minutes);
+		if (hours != "0") jo.put("hours", hours);
+		if (days != "*") jo.put("days", days);
+		if (months != "*") jo.put("months", months);
+		if (weekdays != "*") jo.put("weekdays", weekdays);
+		jo.put("timezond", timezoneName);
+		return jo;
+	}
 }
