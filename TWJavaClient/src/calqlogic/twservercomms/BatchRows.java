@@ -21,9 +21,9 @@ import nmg.softwareworks.jrpcagent.Logging;
 class BatchRows<T>{
 	ArrayList<T> rows = new ArrayList<T>();
 	ArrayList<T>getRows(){return rows;}
-	@SuppressWarnings("unchecked")
+
 	private void parseRows(JsonParser jParser, SignatureElement[] sig, Constructor<T>rowBeanConstructor, boolean validate) throws IOException {
-		//positioned at start of first row (or end of array of rows)
+		//positioned at start of array of rows)
 		@SuppressWarnings("unused")
 		JsonToken tkn;
 		if (sig == FOLSignature) {
@@ -32,13 +32,17 @@ class BatchRows<T>{
 				deserializeFOLRows(anode);
 			return;
 		}
+		tkn = jParser.currentToken(); //consume the start array for the array of rows
+		if (tkn == JsonToken.START_ARRAY) jParser.nextToken();
+		else {
+			Logging.log("array of rows does not begin with START_ARRAY");
+			var what = jParser.readValueAsTree();
+			return;
+		}
 		while (((tkn = jParser.currentToken()) == JsonToken.START_ARRAY)) {
-			jParser.nextToken(); //consume the start array for the array of rows
-			jParser.nextToken();//consume the start array token for a row
 			var nextRow = parseOneRow(jParser, sig,  validate);
 			if (nextRow == null) return;
 			if (rowBeanConstructor != null) {
-				//Object bean;
 				try {
 					T bean = rowBeanConstructor.newInstance(nextRow);
 					rows.add(bean);
@@ -46,16 +50,28 @@ class BatchRows<T>{
 					Logging.log(e, String.format("constructor for <%s> failed", Constructor.class));
 					return;}
 			}
-			else {rows.add((T)nextRow);	}	
+			else {
+				rows.add((T)nextRow);
+
+			}	
 		}
-		if (consumeExcess(jParser)) 
-			Logging.log("something other than a json array in the array of rows");
+		if (tkn == JsonToken.END_ARRAY) {
+			//leave the closing bracket as the current token
+		  //tkn = jParser.nextToken(); 
+		  return;
+		}
+		Logging.log("something in the array of rows than an array!");
+		//something in the array of arrays other than an array!
+		//if (consumeExcess(jParser)) 
+		//	Logging.log("something other than a json array in the array of rows");
 	}
+
 	private boolean consumeExcess(JsonParser jParser) throws IOException {
 		//consume any excess array elements,and then consume the end array token
 		var hasExcess = false;
-		while (jParser.currentToken() != JsonToken.END_ARRAY) {//consume and discard remaining elements of json array
-			jParser.readValueAsTree();
+		while (true) {
+			var tkn = jParser.currentToken();
+			if (tkn == JsonToken.END_ARRAY) break;
 			hasExcess = true;
 		}
 		return hasExcess;
@@ -89,10 +105,13 @@ class BatchRows<T>{
 	}
 
 	private Object[] parseOneRow(JsonParser jParser,  SignatureElement[] sig,  boolean validate) throws IOException {
-		/*if (jParser.currentToken() != JsonToken.START_ARRAY) {//should never be true
+		//should be positioned at opening bracket of a json array
+		//will consume everthing through (and including) the closing bracket and leave currenttoken as the token following the closing bracket of the row
+		if (jParser.currentToken() != JsonToken.START_ARRAY) {//should never be true
 			jParser.readValueAsTree();
 			return null;
-		}*/
+		}
+		jParser.nextToken(); //move past the open bracket
 		var row = new Object[sig.length];
 		int index = 0;
 		for (var se : sig) {
@@ -102,12 +121,14 @@ class BatchRows<T>{
 			if (row[index] == null) return null;
 			index++;
 		}
-		if (consumeExcess(jParser))	{		
+		if (jParser.currentToken() == JsonToken.END_ARRAY)
+			jParser.nextToken();
+		/*if (consumeExcess(jParser))	{		
 			Logging.log("Deserializing a row : too many values");
 			return null;
 		}
 		@SuppressWarnings("unused")
-		var tkn = jParser.nextToken();
+		var tkn = jParser.nextToken();*/
 		return row;
 	}
 
@@ -123,8 +144,7 @@ class BatchRows<T>{
 			if (sig == null && dsstate.containsKey("FOL"))
 				sig = FOLSignature;
 				
-			@SuppressWarnings("unchecked")
-			var rowBeanConstructor = (Constructor<T>)dsstate.get("rowBeanConstructor");
+			
 			if (sig == null ) {
 				jParser.readValueAsTree();
 				throw new IOException("no row signature available for deserializing  batch rows");
@@ -133,10 +153,11 @@ class BatchRows<T>{
 					throw new IOException(String.format("batch rows not serialized as a json array <%s>", whatIsIt));
 			} else {
 				//jParser.nextToken();
-				var rslt = new BatchRows<T>();
+				var rslt = new BatchRows<T>();@SuppressWarnings("unchecked")
+				var rowBeanConstructor = (Constructor<T>)dsstate.get("rowBeanConstructor");
 				rslt.parseRows(jParser, sig, rowBeanConstructor, false);
-				@SuppressWarnings("unused")
-				var tkn = jParser.currentToken(); //should be end_array
+				//@SuppressWarnings("unused")
+				//var tkn = jParser.currentToken(); //should be end_array //MOVE THIS to parseRows FOR STREAMING PARSER!
 				return rslt;
 			}
 		}

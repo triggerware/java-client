@@ -5,9 +5,11 @@ import java.math.BigInteger;
 import java.time.*;
 import java.util.Hashtable;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.TreeNode;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
@@ -73,6 +75,7 @@ public class TWBuiltInTypes {
 	}
 	
 	private static Number parseNumericValue(JsonParser jParser, Class<?> type, boolean validate) throws IOException {
+		if (type == Object.class) return jParser.getNumberValue();
 		var tkn = jParser.currentToken();
 		if (type == Long.class || type == Integer.class || type == Short.class || type == Byte.class || type == BigInteger.class) {
 			if (tkn == JsonToken.VALUE_NUMBER_INT) {
@@ -81,6 +84,7 @@ public class TWBuiltInTypes {
 			    if (type == Short.class) return jParser.getShortValue();
 			    if (type == Byte.class) return jParser.getByteValue();
 			    if (type == BigInteger.class) return jParser.getBigIntegerValue();
+			    if (type == Object.class) return jParser.getNumberValue();
 			}
 			jParser.readValueAsTree();
 			throw new IOException(String.format("expected a <%s> serialization", type));
@@ -113,8 +117,7 @@ public class TWBuiltInTypes {
 			//when the target is JSON a null serialization reprsents json null
 			//for all other types, it represent sql null, which is represented as Java null
 			value = (type == TreeNode.class) ? NullNode.getInstance() : null;
-		}
-		if (Number.class.isAssignableFrom(type)) {
+		} else if (tkn.isNumeric()) {
 			value = parseNumericValue(jParser, type, validate);
 			jParser.nextToken();
 		} else if (type == String.class) {
@@ -125,14 +128,13 @@ public class TWBuiltInTypes {
 				jParser.readValueAsTree();
 				throw new IOException("expected a String serialization");
 			}
-		}
-		else if (type.getName().startsWith("java.time.")) { //a temporal class serialization
+		} else if (type.getName().startsWith("java.time.")) { //a temporal class serialization
 			value = parseTemporalValue(jParser, type, validate);
 			jParser.nextToken();
 		} else if (type == DataBlob.class) {//TODO handle datablob
 			value = "";
 			jParser.nextToken();
-		}else if (type == TreeNode.class) {
+		} else if (type == TreeNode.class) {
 			var deserialized = jParser.readValueAsTree();
 			value = (deserialized instanceof TextNode && 
 					((TextNode)deserialized).textValue().equals(sqlNullJsonSerialization)) ? null : deserialized;

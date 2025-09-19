@@ -77,7 +77,7 @@ public class JsonUtilities {
 	static final MappingJsonFactory mjfactory =  new MappingJsonFactory();
 	//static final SimpleModule JRPCRules = new SimpleModule(); //currently empty, but should have something for messages, no?
 	public static final JsonMapper jsonMapper(SerializationState deserializationState) { 
-		ContextAttributes defaultDsAtts = ContextAttributes.getEmpty().withSharedAttribute("deserializationState", deserializationState);
+		var defaultDsAtts = ContextAttributes.getEmpty().withSharedAttribute("deserializationState", deserializationState);
 		var mapper = JsonMapper.builder(mjfactory) .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 				.defaultAttributes(defaultDsAtts) //.constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
 				.build();

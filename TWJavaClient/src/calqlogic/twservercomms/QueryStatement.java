@@ -10,7 +10,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import calqlogic.twservercomms.AbstractQuery.SignatureElement;
@@ -48,7 +47,6 @@ public class QueryStatement implements Statement{
 		this.fetchSize = ((TriggerwareClient)(connection.getAgent())).getDefaultFetchSize();
 	}
 	
-	//protected void setSignatureFree(boolean signatureFree) {this.signatureFree = signatureFree;}
 	public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {}
 
 	/** 
@@ -100,7 +98,6 @@ public class QueryStatement implements Statement{
 					var whatIsIt = jParser.readValueAsTree();
 					throw new IOException(String.format("ad hoc query result not serialized as a json object <%s>", whatIsIt));
 				} else {
-					//tkn = jParser.nextToken();
 					Integer handle = null;
 					SignatureElement[]signature = null;
 					Batch<T>batch = null;
@@ -119,16 +116,14 @@ public class QueryStatement implements Statement{
 							break;
 							}
 						case "signature" ->{
-							//temporary code
-							//var jsig = (ArrayNode)jParser.readValueAsTree();
-							//signature = SignatureElement.fromTree(jsig);
 							signature = jParser.readValueAs(SignatureElement[].class);
 							dsstate.put("rowSignature", signature);
+							break;
 							}
 						case "batch" ->{
 							if (!dsstate.containsKey("rowSignature") && dsstate.containsKey("FOL")) {
 								dsstate.put("rowSignature", BatchRows.FOLSignature);}
-							ObjectMapper mapper = (ObjectMapper) jParser.getCodec();
+							var mapper = (ObjectMapper) jParser.getCodec();
 							batch = mapper.readValue(jParser,Batch.class);
 							break;
 							}
