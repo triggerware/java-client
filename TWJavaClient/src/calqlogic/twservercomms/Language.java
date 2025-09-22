@@ -6,11 +6,11 @@ package calqlogic.twservercomms;
  */
 public final class Language {
 	/**
-	 * The TW server's FOL language
+	 * The TW-FOL query language
 	 */
-	//public final static String FOL = "fol";
+	public final static String FOL = "fol";
 	/**
-	 * The TW server's SQL language
+	 * The TW-SQL query language
 	 */
 	public final static String SQL = "sql";
 }
