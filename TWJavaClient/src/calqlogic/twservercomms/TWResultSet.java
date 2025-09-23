@@ -288,20 +288,17 @@ public class TWResultSet<T> implements  AutoCloseable{
 		private final Constructor<T>rowConstructor;
 		private final SignatureElement[]sig;
 		NextResultSetRequest(JavaType responseType,  Constructor<T>rowConstructor, SignatureElement[]sig){
-			super(responseType, /*null,*/ "next-resultset-batch",  1, 3); //args are handle of resultset, countlimit, timelimit
+			super(responseType,  "next-resultset-batch",  1, 3); //args are handle of resultset, countlimit, timelimit
 			this.rowConstructor = rowConstructor;
 			this.sig = sig;
 		}
 		@Override
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
-			//SignatureElement[] signature = (SignatureElement[])attributes.getAttribute("rowSignature");
-			//if (signature != null) attributes.withSharedAttribute("signature", signature);
-			if (rowConstructor != null) {
-				@SuppressWarnings("unchecked")
-				var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+			@SuppressWarnings("unchecked")
+			var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+			dsstate.put("rowSignature", sig);
+			if (rowConstructor != null) 
 				dsstate.put("rowBeanConstructor", rowConstructor);
-				dsstate.put("rowSignature", sig);
-			}
 		}
 	}
 	/*@SuppressWarnings("rawtypes")

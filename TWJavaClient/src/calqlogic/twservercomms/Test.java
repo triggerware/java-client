@@ -1,6 +1,6 @@
 package calqlogic.twservercomms;
 
-import java.io.ByteArrayInputStream;
+
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.time.*;
@@ -10,13 +10,13 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.*;
+
 import calqlogic.twservercomms.AbstractQuery.SignatureElement;
 import calqlogic.twservercomms.PreparedQuery.PositionalParameterDeclarations;
 import calqlogic.twservercomms.TWResultSet.TWResultSetException;
 import calqlogic.twservercomms.TriggerwareClient.TriggerwareClientException;
 import nmg.softwareworks.jrpcagent.*;
 import nmg.softwareworks.jrpcagent.Logging.ILogger;
-import nmg.softwareworks.jrpcagent.PositionalParameterRequest;
 
 class Test {
 	
@@ -31,11 +31,25 @@ class Test {
 			noopRequest.execute(primaryConnection);	}		
 	}
 
-	private static void parserTest(Class<?>cls, String json) {
+	/*private static void parserTest(Class<?>cls, String json) {
 		 var instream =   new ByteArrayInputStream(json.getBytes()); 
-		 var om = new ObjectMapper(new MappingJsonFactory());
+		 var deserializationState = new SerializationState(null);
+		 var jm = JsonUtilities.jsonMapper(deserializationState);
 		 try {
-			 var parsed = om.readValue(instream, cls);
+			 var parsed = jm.readValue(instream, cls);
+			 parsed = parsed;
+		} catch (Exception e) {
+			e = e;
+		}
+	}*/
+	/*private static void parserTest(TypeReference jtr, String json) throws IOException {
+		 var instream =   new ByteArrayInputStream(json.getBytes()); 
+		 var dsstate = new SerializationState(null);
+		 dsstate.put("xyz", 123);
+		 var jm = JsonUtilities.jsonMapper(dsstate);
+		 //var parser = jm.createParser(instream);
+		 try {
+			 var parsed = jm.readValue(instream,jtr);
 			 parsed = parsed;
 		} catch (Exception e) {
 			e = e;
@@ -265,22 +279,43 @@ class Test {
 		try(var fqs = new FOLQueryStatement(client)){
 			fqs.setFetchSize(6);
 			var fol = "((factor) s.t. (demo::inflation 1995 2000 factor))";			
+
+			 try (var rsxxx = fqs.executeQuery(Object[].class, fol, "AP5")){
+				while (rsxxx.next()) {
+					var nextRow = rsxxx.get();
+					showRow((Object[])nextRow);
+				}
+			}catch(Exception rse) {
+				rse = rse;			}
+			fol = "((FACTOR ) s.t.  (E () (AND (INFLATION 1990  2000  FACTOR ))))";		
 			try (var rsxxx = fqs.executeQuery(Object[].class, fol, "AP5")){
 				while (rsxxx.next()) {
 					var nextRow = rsxxx.get();
 					showRow((Object[])nextRow);
 				}
 			}catch(Exception rse) {
-				rse = rse;
-			}
+				rse = rse;	}
+
+			fol = "((TITLE ID TYPE FORMEDIN AGENT FILINGDATE ) s.t.(E () (AND (BIZFILE-FIND \"Google\"  TITLE  ID  TYPE  FORMEDIN  AGENT  FILINGDATE ))))";
+			try (var rsxxx = fqs.executeQuery(Object[].class, fol, "AP5")){
+				while (rsxxx.next()) {
+					var nextRow = rsxxx.get();
+					showRow((Object[])nextRow);
+				}
+			}catch(Exception rse) {
+				rse = rse;	}
 		}
 		
 		try(var qs = new QueryStatement(client)){
 			sql = "SELECT 55";
 			var rsxxx = qs.executeQuery(Object[].class, sql, "AP5");
+			if (rsxxx.next()) {
+				var nextRow = (Object[])rsxxx.get();
+				Logging.log("returned [%d]", nextRow[0]);
+			}
 			
-			sql = "SELECT * FROM demo.inflation WHERE year1 = 1998 AND year2 = 2006";
-			var rsPMS = qs.executeQuery(InflationRecord.class, sql, "AP5");
+			sql = "SELECT * FROM inflation WHERE year1 = 1998 AND year2 = 2006";
+			var rsPMS = qs.executeQuery(InflationRecord.class, sql, "DEMO");
 			sig = rsPMS.getRowSignature();
 			try {
 				while (rsPMS.next()) {
@@ -288,23 +323,21 @@ class Test {
 					Logging.log("year1 = %d, year2 = %d, factor = %f", nextRow.year1, nextRow.year2, nextRow.factor);
 				}
 			}catch(Exception rse) {
-				rse = rse;
-			}
+				rse = rse; }
 
 			sql = """
 					SELECT CAST(3000000 as ANYINT), CAST(300000 AS BIGINT), CAST (30000 AS INTEGER),  CAST (3000 AS SMALLINT), CAST(35 AS TINYINT),
 					CAST(2238.769987 AS DOUBLE), CAST(2238.769987 AS FLOAT)
 					""";
-		   var rsNum = qs.executeQuery(JustNumbers.class, sql, "AP5");
+		   var rsNum = qs.executeQuery(JustNumbers.class, sql, "DEMO");
 		   sig = rsNum.getRowSignature();
-		   //sig = sig;
 		   sql = "SELECT 'abc', 'xyz' COLLATE ci ";
-		   var rsText = qs.executeQuery(JustText.class, sql, "AP5");
+		   var rsText = qs.executeQuery(JustText.class, sql, "DEMO");
 		   sig = rsText.getRowSignature();
 		   //sig = sig;
 		   
 		   sql = "SELECT Current_timestamp() as now, current_date()as today, current_time() as clock, INTERVAL 3 DAY as howlong";
-		   var rsTemporal = qs.executeQuery(TemporalFields.class, sql, "AP5");
+		   var rsTemporal = qs.executeQuery(TemporalFields.class, sql, "DEMO");
 		   sig = rsTemporal.getRowSignature();
 			/*sql = 
 					"SELECT * FROM device WHERE MANUFACTURER_D_NAME LIKE '%MEDTRONIC%' ";
@@ -325,9 +358,9 @@ class Test {
 					}
 					return true;
 				}};
-			sql = "SELECT pmid,title FROM [sql-relations].[pubmed-search] WHERE query='toenail' AND title LIKE '%o%'";
-			qs.executeQueryWithNotificationResults(PubmedRecord.class, sql,  "AP5",  controller);
-			synchronized(noMoreRows) {try { noMoreRows.wait();
+			sql = "SELECT pmid,title FROM pubmed_search WHERE query='toenail' AND title LIKE '%o%'";
+			qs.executeQueryWithNotificationResults(PubmedRecord.class, sql,  "DEMO",  controller);
+			synchronized(noMoreRows) {try {noMoreRows.wait();
 			} catch (InterruptedException e) {}}
 		}
 	}
@@ -335,8 +368,8 @@ class Test {
 			throws JRPCException, TriggerwareClientException {
 
 		var pdecls = new PositionalParameterDeclarations(); pdecls.add("integer");
-		try(var pq = new PreparedQuery<InflationRecord>(client, InflationRecord.class, "SELECT * FROM demo.inflation WHERE year1 = 1998 AND year2 = ?",
-				"AP5", pdecls)){
+		try(var pq = new PreparedQuery<InflationRecord>(client, InflationRecord.class, "SELECT * FROM inflation WHERE year1 = 1998 AND year2 = ?",
+				"DEMO", pdecls)){
 			pq.setFetchSize(1);
 			pq.setParameter(1, 2006);
 			try(var rsINF = pq.createResultSet()){
@@ -463,9 +496,12 @@ class Test {
 			public synchronized void log (String format, Object ... args) {System.out.println(String.format(format,args));}
 		});
 
-		//jsonTest();
-		//blobTest();
-		//temporalTest();
+		//var typeRef = new TypeReference<ResultSetResult<Object[]>>() {};
+        
+		/*parserTest(typeRef, """
+				{"signature" : [{"attribute": "FACTOR","type" : ""}], 
+				 "batch": {"count" : 1, "exhausted" : true, "tuples" : [[1.12]]}}"
+				""");*/
 		/*parserTest( PreparedQuery.PreparedQueryRegistration.class, """
 				{"signature":[{"attribute":"year1","type":"smallInt"},{"attribute":"year2","type":"smallInt"},{"attribute":"factor","type":"Float"}],
 				 "handle":1,

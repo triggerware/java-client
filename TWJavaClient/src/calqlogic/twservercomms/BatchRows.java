@@ -116,19 +116,13 @@ class BatchRows<T>{
 		int index = 0;
 		for (var se : sig) {
 			var type = se.twSqlType;
-			//jParser.nextToken();
-			row[index] = TWBuiltInTypes.parseOneValue(jParser, type, validate);
-			if (row[index] == null) return null;
-			index++;
+			if (index>0) jParser.nextToken();
+			row[index++] = TWBuiltInTypes.parseOneValue(jParser, type, validate);
 		}
-		if (jParser.currentToken() == JsonToken.END_ARRAY)
-			jParser.nextToken();
-		/*if (consumeExcess(jParser))	{		
-			Logging.log("Deserializing a row : too many values");
-			return null;
-		}
-		@SuppressWarnings("unused")
-		var tkn = jParser.nextToken();*/
+		//row consumed.  next token should be closing bracket of row
+		if (jParser.nextToken() == JsonToken.END_ARRAY)
+			jParser.nextToken(); //move past the close bracket
+		else throw new IOException("too many values in a row");
 		return row;
 	}
 
@@ -153,7 +147,8 @@ class BatchRows<T>{
 					throw new IOException(String.format("batch rows not serialized as a json array <%s>", whatIsIt));
 			} else {
 				//jParser.nextToken();
-				var rslt = new BatchRows<T>();@SuppressWarnings("unchecked")
+				var rslt = new BatchRows<T>();
+				@SuppressWarnings("unchecked")
 				var rowBeanConstructor = (Constructor<T>)dsstate.get("rowBeanConstructor");
 				rslt.parseRows(jParser, sig, rowBeanConstructor, false);
 				//@SuppressWarnings("unused")

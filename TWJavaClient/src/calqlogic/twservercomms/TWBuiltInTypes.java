@@ -84,7 +84,7 @@ public class TWBuiltInTypes {
 			throw new IOException(String.format("expected a <%s> serialization", type));
 		}
 		if (tkn != JsonToken.VALUE_NUMBER_FLOAT) {
-			jParser.readValueAsTree();
+			var tree = jParser.readValueAsTree();
 			throw new IOException(String.format("expected a <%s> serialization", type));
 		}
 		if (type == Double.class) return jParser.getDoubleValue();
@@ -95,6 +95,16 @@ public class TWBuiltInTypes {
 		throw new IOException(String.format("expected a <%s> serialization", type));
 	}
 	
+	static Object parseOneValueRaw(JsonParser parser) throws IOException {//consumes value, does not advance to the next unconsumed token
+		var tval = parser.readValueAsTree();
+		if (tval instanceof ValueNode vn) {
+			if (vn.isTextual()) return vn.asText();
+			if (vn.isNull()) return null;
+			if (vn instanceof NumericNode nn) return nn.numberValue();
+		}
+		throw new IOException("a column value was serialized as a non value node");
+	}
+	
 	/**parse on TW SQL value using the parser, and leave the stream positioned at the next token following the value
 	 * @param jParser the parser being used to deserialize the value
 	 * @param type the java type expected for the value
@@ -102,39 +112,43 @@ public class TWBuiltInTypes {
 	 * @return the jave value of the expected type
 	 * @throws IOException
 	 */
-	static Object parseOneValue(JsonParser jParser, Class<?> type, boolean validate) throws IOException {
+	static Object parseOneValue(JsonParser jParser, Class<?> type, boolean validate) throws IOException {//consumes one value from the current token, does not advance to the next unconsumed token
 		//TODO: associate the code for parsing with the class object in a hash table
-		Object value = null;
+		if (type == Object.class)
+			return parseOneValueRaw(jParser);
 		var tkn = jParser.currentToken();
 		if (tkn == JsonToken.VALUE_NULL) {
 			jParser.nextToken(); //consume the null
 			//when the target is JSON a null serialization reprsents json null
 			//for all other types, it represent sql null, which is represented as Java null
-			value = (type == TreeNode.class) ? NullNode.getInstance() : null;
-		} else if (tkn.isNumeric()) {
-			value = parseNumericValue(jParser, type, validate);
-			jParser.nextToken();
-		} else if (type == String.class) {
+			return (type == TreeNode.class) ? NullNode.getInstance() : null;
+		}
+		
+		if (type.getName().startsWith("java.time."))  //a temporal class serialization
+			return parseTemporalValue(jParser, type, validate);
+		
+		if (tkn.isNumeric()) 
+			return parseNumericValue(jParser, type, validate);
+
+		if (type == String.class) {
 			if (tkn == JsonToken.VALUE_STRING) {
-				value = jParser.getText();
-			    jParser.nextToken();		    
-			}else {
-				jParser.readValueAsTree();
-				throw new IOException("expected a String serialization");
+				return jParser.getText();		    
+			} else {
+				var tn = jParser.readValueAsTree();
+				throw new IOException(String.format("expected a String serialization, received %s", tn));
 			}
-		} else if (type.getName().startsWith("java.time.")) { //a temporal class serialization
-			value = parseTemporalValue(jParser, type, validate);
-			jParser.nextToken();
-		} else if (type == DataBlob.class) {//TODO handle datablob
-			value = "";
-			jParser.nextToken();
-		} else if (type == TreeNode.class) {
+		}
+
+		if (type == DataBlob.class) //TODO handle datablob
+			return "";
+
+		if (type == TreeNode.class) {
 			var deserialized = jParser.readValueAsTree();
-			value = (deserialized instanceof TextNode && 
+			return (deserialized instanceof TextNode && 
 					((TextNode)deserialized).textValue().equals(sqlNullJsonSerialization)) ? null : deserialized;
 		}
 		
-		return value;
+		return null;
 	}
 
 }
