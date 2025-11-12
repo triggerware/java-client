@@ -34,7 +34,7 @@ public class QueryStatement implements Statement{
 	 * create a new query statement on a clients primary connection
 	 * @param client the client that will use this QueryStatement
 	 */
-	protected QueryStatement(TriggerwareClient client) {
+	public QueryStatement(TriggerwareClient client) {
 		this(client.getPrimaryConnection());}
 
 	/**
@@ -63,15 +63,15 @@ public class QueryStatement implements Statement{
 
 	@JsonFormat(shape=JsonFormat.Shape.OBJECT)
 	@JsonDeserialize(using = ResultSetResult.RSRDeserializer.class)
-	static class ResultSetResult<T> {
+	private static class ResultSetResult<T> {
 		public Integer handle;
 		@JsonDeserialize(using = SignatureDeserializer.class)
 		public final SignatureElement[] rowSignature;
 		public final Batch<T> batch;
-		public Constructor<T> rowConstructor;
+		//public Constructor<T> rowConstructor;
 		TWResultSet<T> resultSet;
-		Integer getHandle() {return handle;}
-		Batch<T>getBatch(){return batch;}
+		//Integer getHandle() {return handle;}
+		//Batch<T>getBatch(){return batch;}
 		@JsonCreator 
 		public ResultSetResult(@JsonProperty(value = "handle", required = false) Integer handle, @JsonProperty("signature")SignatureElement[] signature,
 						 @JsonProperty(value = "batch", required = false) Batch<T> batch){
@@ -80,10 +80,10 @@ public class QueryStatement implements Statement{
 			 this.rowSignature = signature;
 		 }
 		SignatureElement[]getSignature(){ return rowSignature;}
-		Constructor<T> getRowConstructor(){return rowConstructor;}
+		//Constructor<T> getRowConstructor(){return rowConstructor;}
 		void setResultSet(TWResultSet<T> resultSet) {this.resultSet = resultSet;}
 		TWResultSet<T> getResultSet() {return resultSet;};
-		void setRowConstructor(Constructor<T> rowConstructor) {this.rowConstructor = rowConstructor;}
+		//void setRowConstructor(Constructor<T> rowConstructor) {this.rowConstructor = rowConstructor;}
 		
 		static class RSRDeserializer<T> extends JsonDeserializer<ResultSetResult<T>>{
 
@@ -223,10 +223,10 @@ optional:
 		private final Constructor<T> rowConstructor;
 		@SuppressWarnings("unchecked")
 		AdHocQueryRequest(JavaType responseType, Class<?>rowClass){
-			super(responseType, /*null,*/ "execute-query",  null, null);
+			super(responseType,  "execute-query",  null, null);
 			rowConstructor = (Constructor<T>) AbstractQuery.getRowConstructor(rowClass);
 		}
-		Constructor<T> getRowConstructor(){return rowConstructor;}
+		//Constructor<T> getRowConstructor(){return rowConstructor;}
 		@Override
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
 			QueryStatement.this.establishResponseDeserializationAttributes(request,  response,  ctxt);
@@ -288,8 +288,8 @@ optional:
 		var params = commonParams(query, schema);
 		if (qrl!=null) params.with("limit", qrl.rowCountLimit).with("timelimit", qrl.timeout);
 		var eqresult = (ResultSetResult<T>)connection.synchronousRPC(eqNPR, params);
-		eqresult.setRowConstructor(eqNPR.rowConstructor);
-		var rs = new TWResultSet<T>(eqNPR.rowConstructor, connection, eqresult.handle, fetchSize, eqresult.rowSignature, eqresult.batch.getRows());
+		//eqresult.setRowConstructor(eqNPR.rowConstructor);
+		var rs = new TWResultSet<T>(eqNPR.rowConstructor, connection, eqresult.handle, fetchSize, qrl.rowCountLimit,  eqresult.rowSignature, eqresult.batch.getRows());
 		eqresult.setResultSet(rs);
 		resultSet = rs;
 		return rs;
@@ -344,6 +344,7 @@ optional:
 	 * @throws TriggerwareClientException if this QueryStatement is closed or if it is still executing some other query
 	 */
 	@SuppressWarnings("unchecked")
+	public //public only because of testing
 	<T> void executeQueryWithNotificationResults(Class<T>rowClass, String query,  String schema,
 						NotificationResultController<T> controller) throws TriggerwareClientException, JRPCException{
 		commonCheck();
@@ -352,11 +353,11 @@ optional:
 		var jt = typeFactory.constructParametricType(ResultSetResult.class, rowClass);
 		var eqParams = commonParams(query,schema).with("limit", 0);
 		Constructor<T> rowConstructor = AbstractQuery.getRowConstructor(rowClass);
-		var eqresult = (ResultSetResult<T>)connection.synchronousRPC(jt, /*null,*/  "execute-query", eqParams);//just get the resultset, but no rows
+		var eqresult = (ResultSetResult<T>)connection.synchronousRPC(jt, "execute-query", eqParams);//just get the resultset, but no rows
 		controller.setHandle(connection, eqresult.handle, eqresult.getSignature(), rowConstructor, eqresult.getResultSet()); //that registers the handler
 		//now start streaming
 		var nriParams = controller.controlParams();
-		connection.synchronousRPC(Void.TYPE, /*null,*/ "next-resultset-incremental", nriParams); //tell server to start streaming
+		connection.synchronousRPC(Void.TYPE, "next-resultset-incremental", nriParams); //tell server to start streaming
 	}
 
 	private boolean closed = false;

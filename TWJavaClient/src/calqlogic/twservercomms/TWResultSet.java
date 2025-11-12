@@ -81,23 +81,24 @@ public class TWResultSet<T> implements  AutoCloseable{
 	@JsonProperty("batch")
 	private Batch<T> batch;
 	private final Connection connection;
+	private final Integer maxRows;
+	private int rowsSoFar;
 	private final JavaType jtForNextBatchRequest;
-	TWResultSet(Constructor<T>rowConstructor, Connection connection, Integer handle, Integer fetchSize,  SignatureElement[]signature, ArrayList<T>rows){ //QueryStatement.ResultSetResult<T>eqResult){
+	TWResultSet(Constructor<T>rowConstructor, Connection connection, Integer handle, Integer fetchSize,  Integer maxRows, SignatureElement[]signature, ArrayList<T>rows){
 		this.rowConstructor = rowConstructor;
-		//this.statement = statement; 
 		this.connection = connection;
 		this.fetchSize = fetchSize;
+		this.maxRows = maxRows;
 		this.handle = handle;
 		exhausted = (handle == null);
 		jtForNextBatchRequest =  connection.getTypeFactory().constructType(Batch.class);
-		//var rows = eqResult.getBatch().getRows();
 		if (rows == null)	cacheSize = 0;
 		else {
 			cacheSize = rows.size();
 			cache.addAll(rows);
 		}
 
-		//fromQuery = null;
+		rowsSoFar = cacheSize;
 		this.signature = signature;//eqResult.getSignature();
 		if (signature != null) {
 			columnNames = new String[signature.length];
@@ -105,20 +106,6 @@ public class TWResultSet<T> implements  AutoCloseable{
 				columnNames[i] = signature[i].name;
 		} else columnNames = null;
 	}
-	/*TWResultSet( Constructor<T>rowConstructor, Connection connection, Integer fetchSize, ArrayList<T>rows ){//PreparedQuery.CreateResultSetResult<T> crsResult
-		this.rowConstructor = rowConstructor;
-		//this.statement = null;
-		signature = null;
-		//fromQuery = pq;
-		columnNames = pq.getInputNames();
-		jtForNextBatchRequest =  connection.getTypeFactory().constructType(Batch.class); //constructParametricType(Batch.class, rowClass);
-		var rows = crsResult.getBatch().getRows();
-		if (rows == null)	cacheSize = 0;
-		else {
-			cacheSize = rows.size();
-			cache.addAll(rows);
-		}
-	}*/
 
 	/**
 	 * Obtain the signature of this TWResultSet. Each row delivered by {@link #get()} is an Object[] whose
@@ -253,16 +240,17 @@ public class TWResultSet<T> implements  AutoCloseable{
 			close();
 			throw new TWResultSetException("internal error", e);
 		}
-		var rows = nextBatch.getRows();
+		var rows = nextBatch == null ? null : nextBatch.getRows();
 		if (rows==null || rows.isEmpty()) {
 			//rowNumber = 0;
 			isAfterLast = true; 
 			//conceivably you could have a fetchsize of zero? So no rows, but not exhausted? Currently tw server requires it to be positive
-			exhausted = nextBatch.isExhausted();
+			exhausted = nextBatch == null || nextBatch.isExhausted();
 			closed = exhausted;
 			return false;
 		} else {
 			cache.addAll(rows);
+			rowsSoFar += rows.size();
 			cacheSize += rows.size();
 			exhausted = nextBatch.isExhausted();
 			isBeforeFirst = false;
@@ -305,16 +293,19 @@ public class TWResultSet<T> implements  AutoCloseable{
 	private static PositionalParameterRequest<TWResultSet.Batch> nextBatchRequest = 
 			new PositionalParameterRequest<TWResultSet.Batch>(TWResultSet.Batch.class, null, "next-resultset-batch", 2, 3);*/
 	@SuppressWarnings("unchecked")
-	private Batch<T>  pulse() throws JRPCException {
+	private Batch<T> pulse() throws JRPCException {
 		//TODO: is it possible to make this request deserialize its result into the existing resultset object?
 
 		var nrsPPR = new NextResultSetRequest<T>(jtForNextBatchRequest, rowConstructor, signature);
+		Integer pulseFetchSize = (maxRows == null) ? fetchSize : Integer.min(fetchSize, maxRows-rowsSoFar);
+		if (pulseFetchSize == 0) {
+				this.close(); // don't ask for more,just close the resultset
+				return null;
+		}
 		if (timeout==null) 
-			return(Batch<T>)connection.synchronousRPC(nrsPPR, new Object[] {handle, fetchSize});
+			return(Batch<T>)connection.synchronousRPC(nrsPPR, new Object[] {handle, pulseFetchSize});
 			
-		//var future = connection.asynchronousRPC(TWResultSet.Batch.class, null, null, "next-resultset-batch", handle, fetchSize, timeout);
-
-		var future = connection.asynchronousRPC(nrsPPR, new Object[] {handle, fetchSize, timeout});
+		var future = connection.asynchronousRPC(nrsPPR, new Object[] {handle, pulseFetchSize, timeout});
 		try {
 			return (Batch<T>)JRPCAsyncRequest.executeWithTimeout(nrsPPR, future, (long)(timeout*1000));
 		} catch (JRPCRequestTimeoutException e) {
@@ -328,7 +319,7 @@ public class TWResultSet<T> implements  AutoCloseable{
 	}
 
 	static PositionalParameterRequest<Void> closeResultSetRequest = 
-			new PositionalParameterRequest<Void>(Void.TYPE, /*null,*/ "close-resultset", 1, 1);
+			new PositionalParameterRequest<Void>(Void.TYPE, "close-resultset", 1, 1);
 	/**
 	 * close this TWResultSet explicitly.  If necessary, this method will notify the TWServer to release
 	 * resources being preserved to produce further rows.

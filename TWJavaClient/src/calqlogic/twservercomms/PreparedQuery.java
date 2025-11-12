@@ -193,22 +193,22 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 	
 	static class CreateResultsetRequest<T> extends NamedParameterRequest<CreateResultSetResult<T>>{
 		private final Constructor<T> rowConstructor;
-		private final SignatureElement[] signature;
+		private final SignatureElement[] rowSignature;
 		private static String[]requiredParams = new String[] {"handle", "inputs"},
 				               optionalParams = new String[] {"limit", "timelimit", "check-update"};
-		CreateResultsetRequest(JavaType responseType, /*Class<?>rowClass,*/ Constructor<T> rowConstructor, SignatureElement[] signature){
-			super(responseType, /*null,*/ "create-resultset",  requiredParams, optionalParams);
+		CreateResultsetRequest(JavaType responseType, Constructor<T> rowConstructor, SignatureElement[] rowSignature){
+			super(responseType, "create-resultset",  requiredParams, optionalParams);
 			this.rowConstructor = rowConstructor;
-			this.signature = signature;
+			this.rowSignature = rowSignature;
 		}
 		Constructor<T> getRowConstructor(){return rowConstructor;}
 		@Override
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
+			@SuppressWarnings("unchecked")
+			var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
+			dsstate.put("rowSignature", rowSignature);
 			if (rowConstructor != null) {
-				@SuppressWarnings("unchecked")
-				var dsstate= (HashMap<String,Object>)ctxt.getAttribute("deserializationState");
 				dsstate.put("rowBeanConstructor", rowConstructor);
-				dsstate.put("rowSignature", signature);
 			}
 		}
 	}
@@ -219,7 +219,7 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 				              optionalParams  = new String[] {"limit", "timelimit", "notify-limit", "notify-timelimit"};
 
 		NotificationResultsRequest(JavaType responseType, /*Class<?>rowClass,*/ Constructor<T> rowConstructor, SignatureElement[] signature){
-			super(responseType, /*null,*/ "create-resultset-incremental",  requiredParams, optionalParams);
+			super(responseType, "create-resultset-incremental",  requiredParams, optionalParams);
 			this.rowConstructor = rowConstructor;
 			this.signature = signature;
 		}
@@ -421,7 +421,7 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 	
 			//now start streaming
 			var nriParams = controller.controlParams();
-			connection.synchronousRPC(Void.TYPE, /*null,*/ "next-resultset-incremental", nriParams); //tell server to start streaming
+			connection.synchronousRPC(Void.TYPE, "next-resultset-incremental", nriParams); //tell server to start streaming
 	}
 
 	/**
@@ -430,8 +430,8 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 	 */
 	public boolean usesNamedParameters() {return usesNamedParameters;}
 	
-	public String[] getOutputSignatureNames(){return outputSignatureNames;}
-	public Class<?>[] getOutputSignatureTypes(){return outputSignatureTypes;}
+	public String[] getOutputSignatureNames(){return outputSignatureNames;} //used only in QueryBuilder. Move 
+	public Class<?>[] getOutputSignatureTypes(){return outputSignatureTypes;} //used only in QueryBuilder. Move 
 	public String[] getOutputSignatureTypeNames(){return outputSignatureTypeNames;}
 	
 	public String[] getInputSignatureNames(){return inputSignatureNames;}
@@ -447,7 +447,6 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 	 */
 	public TWResultSet<T> createResultSet(QueryStatement.QueryResourceLimits qrl) throws JRPCException, TriggerwareClientException {
 		NamedRequestParameters crParams;
-		//Integer fetchSize;
 		synchronized(this) {
 			if (closed)
 				throw new TriggerwareClientException("attempt to execute a closed PreparedQuery");
@@ -455,7 +454,12 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 				throw new TriggerwareClientException("cannot execute a prepared query without setting all the parameters");
 
 			var timeout = (qrl == null) ? null :qrl.getTimeout();
+			var rcl = qrl.getRowCountLimit();
 			Integer fetchSize = this.fetchSize;
+			if (fetchSize == null)  fetchSize = rcl;
+			if (fetchSize != null && rcl != null && rcl<fetchSize) fetchSize = rcl;
+			
+			
 			if (qrl != null && qrl.getRowCountLimit() != null) 
 				fetchSize = qrl.getRowCountLimit();
 			crParams = new NamedRequestParameters().with("handle", twHandle).with("limit", fetchSize)
@@ -481,7 +485,7 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 		}
 		else 
 			eqresult = connection.synchronousRPC(crsResultType, null, "create-resultset", params);*/
-		return new TWResultSet<T>(rowConstructor, connection, crResult.handle, fetchSize, outputSignature, crResult.batch.getRows());
+		return new TWResultSet<T>(rowConstructor, connection, crResult.handle, fetchSize, qrl.getRowCountLimit(), outputSignature, crResult.batch.getRows());
 	}
 	
 	/**  obtain a resultset for this prepared query, providing no resource limits
@@ -493,7 +497,7 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 		return createResultSet(null);}
 
 	private static PositionalParameterRequest<Void> releaseQueryRequest = 
-			new PositionalParameterRequest<Void>(Void.TYPE, /*null,*/ "release-query", 1, 1);
+			new PositionalParameterRequest<Void>(Void.TYPE, "release-query", 1, 1);
 
 	@Override
 	public synchronized void close() {

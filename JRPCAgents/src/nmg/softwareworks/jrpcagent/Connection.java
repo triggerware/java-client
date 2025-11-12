@@ -254,7 +254,15 @@ public class Connection implements Closeable{
 		 * onDisconnect is called when a connection is closed by the agent or by its partner.
 		 * This default method does nothing, but subclasses may need to perform cleanup activities.
 		 */
-		protected void onDisconnect() {}
+		protected void onDisconnect() {};
+		
+		private void notifyPending() {
+			for (var pair : pendingRequests.entrySet()) {
+				var request = pair.getValue();
+				request.onConnectionClosed();
+			}
+			pendingRequests.clear();//unnecessary, but hygenic
+		}
 
 		private boolean disconnecting = false;
 		private synchronized  void disconnect(){		
@@ -264,11 +272,11 @@ public class Connection implements Closeable{
 			try {pendingNotifications.put(theFinalNotification); //causes the thread to terminate
 			} catch (InterruptedException e1) {} 
 			try	{
-				//sock.close();
 				istream.close();
 				ostream.close();
 				connected = false;
 				if (!agent.isShuttingDown()) {
+					notifyPending();
 					onDisconnect();
 				}
 			}catch (IOException e){
@@ -377,7 +385,8 @@ public class Connection implements Closeable{
 			Logging.log("response for %s but no outstanding request! Response ignored.", requestId);
 			return;
 		}
-		synchronized(request) {request.completed(msg);}
+		//synchronized(request) {request.completed(msg);}
+		request.completed(msg);
 	}
 	
 	public void processRequestMessage(IncomingMessage msg) throws IOException {

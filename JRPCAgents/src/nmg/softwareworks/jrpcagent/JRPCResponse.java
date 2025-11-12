@@ -18,6 +18,15 @@ class JRPCResponse<T> {
 		else result = null;
 		responseError = response.responseError;
 	}
+	JRPCResponse(JRPCSimpleRequest<T> request) {//this constructor is used when the connection on which a request is awaiting a response is closed
+		//this.request = request;
+		requestId = request.requestId;
+		hasResult = false;
+		result = null;
+		responseError = JsonUtilities.jnfactory.objectNode();
+		responseError.put("code", -32000);
+		responseError.put("message", "connection closed prior to receiving response");
+	}
 	public T getResult() {return  result;}
 	public boolean hasResult() {return hasResult;}
 

@@ -85,10 +85,10 @@ public abstract class Subscription<T> implements NotificationInducer{
 		}
 	}
 	private static NamedParameterRequest<SSignature> subscribeRequest = 
-			new NamedParameterRequest<SSignature>(SSignature.class, /*null,*/ "subscribe", 
+			new NamedParameterRequest<SSignature>(SSignature.class, "subscribe", 
 					new String[] {"description", "language","package", "label", "method"}, new String[] {"combine"});
 	private static NamedParameterRequest<Void> unsubscribeRequest = 
-			new NamedParameterRequest<Void>(Void.TYPE, /*null,*/ "unsubscribe", 
+			new NamedParameterRequest<Void>(Void.TYPE, "unsubscribe", 
 					new String[] {"description", "label", "method", "combine"}, null);
 	
 	private static final int subscriptionErrorCode = -32701;

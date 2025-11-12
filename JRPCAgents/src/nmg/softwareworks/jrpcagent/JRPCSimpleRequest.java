@@ -192,17 +192,17 @@ public class JRPCSimpleRequest<T> {
 		}*/
 	}
 
-	public void completed(IncomingMessage /*Map<String, ?>*/ msg) {
+	public void completed(IncomingMessage msg) {
 		this.response = new JRPCResponse<T>(msg, this);
-		this.notify(); //wake up thread, if any, waiting for responses
+		synchronized(this) {notify();} //wake up thread waiting for a response
 	}
 	
 	public Object deserializeResult(IncomingMessage response, JsonParser jParser, Connection conn) {
-		//this is the orginal request
+		//'this' is the orginal request
 		//response is the message being deserialized.
 		
-		var dsstate = conn.getDeserializationState();
-		//dsstate.put("request", outbound);
+		//var dsstate = conn.getDeserializationState();
+
 		try {
 			if (resultClass != null)
 				return conn.deserializeResult(jParser, resultClass);
@@ -222,6 +222,11 @@ public class JRPCSimpleRequest<T> {
 
 	void establishResponseDeserializationAttributes(IncomingMessage response, DeserializationContext deserializationContext) {
 		if (outbound != null) outbound.establishResponseDeserializationAttributes(this, response, deserializationContext);	}
+	
+	void onConnectionClosed() { //called when the connection on which this request is awaiting a response gets closed
+		this.response = new JRPCResponse<T>(this);
+		synchronized(this) {this.notify();}		
+	}
 	
 	/*private static final JsonNodeFactory jnfactory = JsonNodeFactory.instance;
 	private static final MappingJsonFactory mjfactory = new MappingJsonFactory();

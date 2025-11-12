@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.cfg.ContextAttributes;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
 /*
  An ObjectMapper is where jackson holds the rules that determine the correspondence between the serialized form of Json (text)
@@ -74,6 +75,7 @@ to make use of it.
 public class JsonUtilities {
 	//may need to run java with command line args
 	// --add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+	static final JsonNodeFactory jnfactory = JsonNodeFactory.instance;
 	static final MappingJsonFactory mjfactory =  new MappingJsonFactory();
 	//static final SimpleModule JRPCRules = new SimpleModule(); //currently empty, but should have something for messages, no?
 	public static final JsonMapper jsonMapper(SerializationState deserializationState) { 

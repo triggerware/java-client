@@ -1,4 +1,4 @@
-package calqlogic.twservercomms;
+package calqlogic.twservercomms.testing;
 
 
 import java.math.BigInteger;
@@ -12,6 +12,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.*;
 
 import calqlogic.twservercomms.AbstractQuery.SignatureElement;
+import calqlogic.twservercomms.*;
+import calqlogic.twservercomms.PolledQuery.PolledQueryControlParameters;
 import calqlogic.twservercomms.PreparedQuery.PositionalParameterDeclarations;
 import calqlogic.twservercomms.TWResultSet.TWResultSetException;
 import calqlogic.twservercomms.TriggerwareClient.TriggerwareClientException;
@@ -26,7 +28,7 @@ class Test {
 			super("test client", twHost, twServerPort);	}
 		
 		private static PositionalParameterRequest<Void> noopRequest = 
-				new PositionalParameterRequest<Void>(Void.TYPE, /*null,*/ "noop", 0, 0);	
+				new PositionalParameterRequest<Void>(Void.TYPE, "noop", 0, 0);	
 		void noop()throws JRPCException {
 			noopRequest.execute(primaryConnection);	}		
 	}
@@ -509,25 +511,16 @@ class Test {
 				 "usesNamedParameters":false}
 				""");*/
 		
-		//serializePQDeclTest();
-		//var aa = ArrayOfArrayListDeserializeTest();
-		//Person ppp = tupleDeserializeTest();
-		//String sss = serializeTest(ppp);
-		//var xxx = executeQueryDeserializeTest();
-		//var xxx = queryResponseDeserializeTest();
-		//classDeserializeTest();
-		//testObjectDeserialization();
+
 		/*var jfactory = new MappingJsonFactory();
 		JsonParser jParser = jfactory.createParser("[ [32.5] , [44] ] ");
 		var javaVal = jParser.readValueAs(java.util.ArrayList[].class);
 		int n = javaVal.length;*/
-		//var tpl = JsonUtilities.deserializeArrayAsTuple(jParser, new Class<?>[] {Double.TYPE, Double.TYPE});
-		//var tkn = jParser.currentToken();
-		//var s = new Socket(InetAddress.getLoopbackAddress(),5221);
-		//int x = s.getSendBufferSize();
+
 		var twClient = new TestClient(InetAddress.getLoopbackAddress(),5221);
-		testAdhocQueries(twClient);
-		testPreparedQueries(twClient);
+		//testAdhocQueries(twClient);
+		//testPreparedQueries(twClient);
+		SwamyRegression.swamyRegressionQueries(twClient);
 		//testPolledQueries(twClient);
 		
 		//var tpq = polledQueryTest(twClient);

@@ -136,7 +136,7 @@ public abstract class PolledQuery<T> extends AbstractQuery<T> {
 	 */
 	protected  PolledQuery(TriggerwareClient client, Class<T>rowClass, String query,  String schema,
 			     PolledQueryControlParameters controls) throws JRPCException {
-		this(client.getPrimaryConnection(), rowClass, query,  Language.SQL, schema,  /*null,*/ controls);}
+		this(client.getPrimaryConnection(), rowClass, query,  Language.SQL, schema, controls);}
 	
 	/**Create a polled query using SQL syntax and register it for use on the primary connection of a client.
 	 * @param client the client on whose primary connection the polled query's notifications will be delivered
@@ -380,7 +380,7 @@ public abstract class PolledQuery<T> extends AbstractQuery<T> {
 	}*/
 
 	private static PositionalParameterRequest<Void> pollRequest = 
-			new PositionalParameterRequest<Void>(Void.TYPE, /*null,*/ "poll-now", 1, 2);
+			new PositionalParameterRequest<Void>(Void.TYPE, "poll-now", 1, 2);
 
 	/**
 	 * perform an on-demand poll of this PolledQuery.
@@ -401,7 +401,7 @@ public abstract class PolledQuery<T> extends AbstractQuery<T> {
 	}
 	
 	private static PositionalParameterRequest<Void> releasePolledQueryRequest =
-			new PositionalParameterRequest<Void>(Void.TYPE, /*null,*/ "close-polled-query", 1, 1);
+			new PositionalParameterRequest<Void>(Void.TYPE, "close-polled-query", 1, 1);
 			
 	/**
 	 *close 

@@ -142,19 +142,19 @@ class BatchRows<T>{
 			if (sig == null ) {
 				jParser.readValueAsTree();
 				throw new IOException("no row signature available for deserializing  batch rows");
-			} else if (jParser.currentToken() != JsonToken.START_ARRAY) {
+			}
+			if (jParser.currentToken() != JsonToken.START_ARRAY) {
 					var whatIsIt = jParser.readValueAsTree();
 					throw new IOException(String.format("batch rows not serialized as a json array <%s>", whatIsIt));
-			} else {
-				//jParser.nextToken();
-				var rslt = new BatchRows<T>();
-				@SuppressWarnings("unchecked")
-				var rowBeanConstructor = (Constructor<T>)dsstate.get("rowBeanConstructor");
-				rslt.parseRows(jParser, sig, rowBeanConstructor, false);
-				//@SuppressWarnings("unused")
-				//var tkn = jParser.currentToken(); //should be end_array //MOVE THIS to parseRows FOR STREAMING PARSER!
-				return rslt;
-			}
+			} 
+
+			var rslt = new BatchRows<T>();
+			@SuppressWarnings("unchecked")
+			var rowBeanConstructor = (Constructor<T>)dsstate.get("rowBeanConstructor");
+			rslt.parseRows(jParser, sig, rowBeanConstructor, false);
+			//@SuppressWarnings("unused")
+			//var tkn = jParser.currentToken(); //should be end_array //MOVE THIS to parseRows FOR STREAMING PARSER!
+			return rslt;
 		}
 	}
 }

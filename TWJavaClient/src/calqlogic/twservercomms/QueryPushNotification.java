@@ -32,7 +32,7 @@ public class QueryPushNotification <T> extends Notification{
 		var more = controller.handleRows(notifiedRows, exhausted);
 		if (more && !exhausted) {
 			try {
-				conn.synchronousRPC(Void.TYPE, /*null,*/ "next-resultset-incremental", controller.controlParams());
+				conn.synchronousRPC(Void.TYPE, "next-resultset-incremental", controller.controlParams());
 			} catch (JRPCException e) {
 				Logging.log("request to get additional rows by notification failed", e);
 				var rs = controller.getResultSet();

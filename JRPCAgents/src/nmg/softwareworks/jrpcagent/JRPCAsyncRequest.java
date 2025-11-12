@@ -60,6 +60,11 @@ public class JRPCAsyncRequest<T> extends JRPCSimpleRequest<T> {
     		future.completeExceptionally(JRPCException.fromError(this, response.getError()));
     	}
     }
+    @Override
+    void onConnectionClosed() { //called when the connection on which this request is awaiting a response gets closed
+    	if (future.isCancelled()) return;
+    	future.completeExceptionally(new JRPCException.JRPCApplicationError (new Exception("the connection on which this request's response would be delivered has been closed.")));
+	}
     
 	public CompletableFuture<T>getFuture(){return future;}
 	

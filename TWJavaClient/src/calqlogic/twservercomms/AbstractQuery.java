@@ -6,8 +6,6 @@ import java.lang.reflect.Modifier;
 
 import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import nmg.softwareworks.jrpcagent.JRPCException;
@@ -109,6 +107,7 @@ public abstract class AbstractQuery<T> implements Cloneable, Closeable{
 	}
 
 	@JsonFormat(shape=JsonFormat.Shape.OBJECT)
+	public
 	static class SignatureElement{
 		final String name;
 		final String typeName;

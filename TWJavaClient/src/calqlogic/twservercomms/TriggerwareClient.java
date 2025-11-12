@@ -285,7 +285,7 @@ public class TriggerwareClient extends JRPCAgent{
 	
 
 	static NamedParameterRequest<Void> setSqlDefaultsRequest =
-			new NamedParameterRequest<Void>(Void.TYPE, /*null,*/ "set-global-default",
+			new NamedParameterRequest<Void>(Void.TYPE,  "set-global-default",
 					null, new String[] {"language", "sql-mode", "sql-namespace"});
 	public void setSqlDefaults(String schema, String mode) throws JRPCException {
 		var params = new NamedRequestParameters();
@@ -325,7 +325,7 @@ public class TriggerwareClient extends JRPCAgent{
 
 
 	static NamedParameterRequest<String> deletePolledQueryRequest = 
-			new NamedParameterRequest<String>(String.class, /*null,*/ "delete-polled-query", null,  null);
+			new NamedParameterRequest<String>(String.class,  "delete-polled-query", null,  null);
 	public String deletePolledQuery (NamedRequestParameters parms) throws JRPCException {
 		return deletePolledQueryRequest.execute(primaryConnection, parms);	}
 
@@ -346,10 +346,10 @@ public class TriggerwareClient extends JRPCAgent{
 		return new QueryStatement(connection);	}
 
 	public <T> T synchronousRPCP(Class<T>classz,  String method, Object ...params) throws  JRPCException {
-		return synchronousRPCP(primaryConnection, classz, /*null,*/ /*null,*/ method, params);}
+		return synchronousRPCP(primaryConnection, classz,   method, params);}
 	
 	public <T> T synchronousRPCP(Connection connection, Class<T>classz, String method, Object ...params) throws  JRPCException {
-		return connection.synchronousRPC(classz, /*null,*/ method, params);}
+		return connection.synchronousRPC(classz,  method, params);}
 	/*public <T> T synchronousRPCP(Connection connection, Class<T>classz,   T resultInstance, boolean serverAsynchronous, 
 			String method, Object ...params) 	throws  JRPCException {
 		//var c = checkConnectionValid(connection);
@@ -357,7 +357,7 @@ public class TriggerwareClient extends JRPCAgent{
 		
 
 	public <T> T synchronousRPCN(Class<T>classz, String method, NamedRequestParameters params) throws JRPCException {
-		return synchronousRPCN(primaryConnection, classz,  /*null,*/ method, params);	}
+		return synchronousRPCN(primaryConnection, classz,   method, params);	}
 	/*public <T> T synchronousRPCN(Connection conn, Class<T>classz,  String method, NamedRequestParameters params) throws JRPCException {
 		return conn.synchronousRPC(classz, method, params);	}*/
 	/**
@@ -372,7 +372,7 @@ public class TriggerwareClient extends JRPCAgent{
 	 */
 	public <T> T synchronousRPCN(Connection connection, Class<T>classz, String method, 
 			NamedRequestParameters params) throws JRPCException {
-		return connection.synchronousRPC(classz, /*null,*/ method, params);	}
+		return connection.synchronousRPC(classz,  method, params);	}
 	/*public <T> T synchronousRPCN(Connection connection, Class<T>classz, T resultInstance, boolean serverAsynchronous, 
 			String method, NamedRequestParameters params) throws JRPCException {
 		//var c = checkConnectionValid(connection);
@@ -412,7 +412,7 @@ public class TriggerwareClient extends JRPCAgent{
 	}*/
 	public <T> CompletableFuture<T> asynchronousRPCP(String method, TypeReference<T>resultType, Object ...params)
 			throws JRPCClosedConnectionError {
-		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(this, true, /*null*/ resultType, method, params);
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(this, true, resultType, method, params);
 					      new JRPCAsyncRequest<T>(resultType, method, params);
 		return primaryConnection.asynchronousRPC(jrpcRequest);
 	}
@@ -443,7 +443,7 @@ public class TriggerwareClient extends JRPCAgent{
 	 * @throws JRPCClosedConnectionError if the connection is closed
 	 */
 	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, String method, Class<T>classz, Object ...params) throws JRPCClosedConnectionError {
-		var jrpcRequest = new JRPCAsyncRequest<T>(classz, method, params); //(JRPCAsyncRequest<T>)createRequest(this, true,  /*null,*/ classz,  method, params);
+		var jrpcRequest = new JRPCAsyncRequest<T>(classz, method, params); //(JRPCAsyncRequest<T>)createRequest(this, true,   classz,  method, params);
 		return connection.asynchronousRPC(jrpcRequest);
 	}
 
@@ -459,7 +459,7 @@ public class TriggerwareClient extends JRPCAgent{
 	 */
 	public <T> CompletableFuture<T> asynchronousRPCP(Connection connection, String method, 
 			TypeReference<T>resultType, /*T resultInstance,*/ Object ...params) throws JRPCClosedConnectionError {
-		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest( this, true, /*null,*/ resultType,  method, params);
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest( this, true,  resultType,  method, params);
 						  new JRPCAsyncRequest<T>(resultType, method, params);
 		return connection.asynchronousRPC(jrpcRequest);
 	}
@@ -562,7 +562,7 @@ public class TriggerwareClient extends JRPCAgent{
 	public <T> CompletableFuture<T> asynchronousRPCN(Connection connection, //boolean serverAsynchronous,  
 			TypeReference<T>resultType, String method, NamedRequestParameters params) throws JRPCClosedConnectionError {
 		//checkConnectionValid(connection);
-		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(this, true, /*null,*/ resultType, method, params);
+		var jrpcRequest = //(JRPCAsyncRequest<T>)createRequest(this, true,  resultType, method, params);
 						  new JRPCAsyncRequest<T>(resultType, method, params);
 		return connection.asynchronousRPC(jrpcRequest);
 	}
