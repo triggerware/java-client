@@ -33,15 +33,18 @@ class BatchRows<T>{
 			return;
 		}
 		tkn = jParser.currentToken(); //consume the start array for the array of rows
-		if (tkn == JsonToken.START_ARRAY) jParser.nextToken();
+		if (tkn == JsonToken.START_ARRAY) jParser.nextToken(); //consume start of array of rows
 		else {
 			Logging.log("array of rows does not begin with START_ARRAY");
 			var what = jParser.readValueAsTree();
 			return;
 		}
-		while (((tkn = jParser.currentToken()) == JsonToken.START_ARRAY)) {
+		//int rowNum = 0;
+		while (((tkn = jParser.currentToken()) == JsonToken.START_ARRAY)) {//start of a single row
+			
 			var nextRow = parseOneRow(jParser, sig,  validate);
 			if (nextRow == null) return;
+			//Logging.log(String.format("have row %d", rowNum++));
 			if (rowBeanConstructor != null) {
 				try {
 					T bean = rowBeanConstructor.newInstance(nextRow);
@@ -112,15 +115,15 @@ class BatchRows<T>{
 			return null;
 		}
 		jParser.nextToken(); //move past the open bracket
-		var row = new Object[sig.length];
+		var row = new Object[sig.length]; //all nulls
 		int index = 0;
 		for (var se : sig) {
 			var type = se.twSqlType;
-			if (index>0) jParser.nextToken();
+			if (index>0) jParser.nextToken();//at first token of value
 			row[index++] = TWBuiltInTypes.parseOneValue(jParser, type, validate);
 		}
 		//row consumed.  next token should be closing bracket of row
-		if (jParser.nextToken() == JsonToken.END_ARRAY)
+		if (jParser.nextToken() == JsonToken.END_ARRAY) //end of a row
 			jParser.nextToken(); //move past the close bracket
 		else throw new IOException("too many values in a row");
 		return row;

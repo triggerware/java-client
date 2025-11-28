@@ -3,9 +3,12 @@ package calqlogic.twservercomms;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.time.*;
+import java.time.format.DateTimeParseException;
 import java.util.Hashtable;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.node.*;
+
+import nmg.softwareworks.jrpcagent.Logging;
 
 public class TWBuiltInTypes {
 
@@ -49,24 +52,31 @@ public class TWBuiltInTypes {
 	
 	
 	private static Object parseTemporalValue(JsonParser jParser, Class<?> type, boolean validate) throws IOException {
-		if (type == Duration.class) {
-			var micros = jParser.getLongValue();
-			var dur = Duration.ofNanos(micros *1000);
-			return  dur == null ? null //sql null
-					             :  dur;
-		}
-		if (type == Instant.class)
-			return Instant.parse(jParser.getText());
-		if (type == LocalDate.class)
-			return LocalDate.parse(jParser.getText());
-		if (type == LocalTime.class) {
-			var micros = jParser.getLongValue();
-			return LocalTime.ofNanoOfDay(micros *1000);
+		String text = null;
+		try {
+			if (type == Duration.class) {
+				var micros = jParser.getLongValue();
+				var dur = Duration.ofNanos(micros *1000);
+				return  dur ;
+			}
+			if (type == LocalTime.class) {
+				var micros = jParser.getLongValue();
+				return LocalTime.ofNanoOfDay(micros *1000);
+			}
+			text = (jParser.currentToken() == JsonToken.VALUE_STRING)? jParser.getText() : "";
+			if (type == Instant.class)
+				return Instant.parse(text);
+			if (type == LocalDate.class)
+				return LocalDate.parse(text);
+		}catch (DateTimeParseException e) {
+			Logging.log(e,String.format("bad serialization of a %s [%s]. Using NULL as the intended value!", type == Instant.class ? "timestamp" : "date", text));
+			return NullNode.getInstance() ;
 		}
 		
 		jParser.readValueAsTree(); //discard value
 		throw new IOException(String.format("expected a <%s> serialization", type));
 	}
+	
 	
 	private static Number parseNumericValue(JsonParser jParser, Class<?> type, boolean validate) throws IOException {
 		if (type == Object.class) return jParser.getNumberValue();
@@ -85,7 +95,7 @@ public class TWBuiltInTypes {
 		}
 		if (tkn != JsonToken.VALUE_NUMBER_FLOAT) {
 			var tree = jParser.readValueAsTree();
-			throw new IOException(String.format("expected a <%s> serialization", type));
+			throw new IOException(String.format("expected a <%s> serialization but received <%s>", type, tree));
 		}
 		if (type == Double.class) return jParser.getDoubleValue();
 		if (type == Float.class) return jParser.getFloatValue();
@@ -114,15 +124,19 @@ public class TWBuiltInTypes {
 	 */
 	static Object parseOneValue(JsonParser jParser, Class<?> type, boolean validate) throws IOException {//consumes one value from the current token, does not advance to the next unconsumed token
 		//TODO: associate the code for parsing with the class object in a hash table
-		if (type == Object.class)
-			return parseOneValueRaw(jParser);
+		
 		var tkn = jParser.currentToken();
 		if (tkn == JsonToken.VALUE_NULL) {
-			jParser.nextToken(); //consume the null
+			//jParser.nextToken(); //consume the null
 			//when the target is JSON a null serialization reprsents json null
 			//for all other types, it represent sql null, which is represented as Java null
 			return (type == TreeNode.class) ? NullNode.getInstance() : null;
 		}
+		if (tkn == JsonToken.END_ARRAY) 
+			return (type == TreeNode.class) ? NullNode.getInstance() : null; //too few values in a row
+		
+		if (type == Object.class)
+			return parseOneValueRaw(jParser);
 		
 		if (type.getName().startsWith("java.time."))  //a temporal class serialization
 			return parseTemporalValue(jParser, type, validate);
