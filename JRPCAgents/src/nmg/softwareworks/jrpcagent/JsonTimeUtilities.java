@@ -5,9 +5,10 @@ import java.time.*;
 import java.time.format.DateTimeParseException;
 
 import com.fasterxml.jackson.core.*;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
  * <p>This class provides static methods for converting between the  Json Schema standard (ISO-8601)
@@ -100,20 +101,20 @@ public class JsonTimeUtilities {
 	 from 
 	 https://www.nuwavesolutions.com/dynamically-parsing-json-to-arbitrary-java-classes-using-the-jackson-json-library/
 	 */
-	private final static SimpleModule isoModule = new SimpleModule();
+	/*public final static SimpleModule isoModule = new SimpleModule();
 	static {
 		isoModule.addDeserializer(Instant.class, new JsonInstantDeserializer() );
 		isoModule.addSerializer(Instant.class, new JsonInstantSerializer() );
-	}
-	public static void isoSerialization(JsonMapper om) {
-		om.registerModule(isoModule);  //(new JavaTimeModule());}
+	}*/
+	public static void isoSerialization(ObjectMapper om) {
+		om.registerModule(new JavaTimeModule()); //(isoModule)
 		om.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 	}
 	
 	public interface CustomDeserializer{
 	    public Object parse(JsonParser parser) throws IOException;}
 	
-	private static final class JsonInstantDeserializer extends JsonDeserializer<Instant>{
+	/*private static final class JsonInstantDeserializer extends JsonDeserializer<Instant>{
 		@Override
 		public Instant deserialize(JsonParser parser, DeserializationContext arg1)
 				throws IOException, JsonProcessingException {
@@ -127,5 +128,5 @@ public class JsonTimeUtilities {
 				throws IOException, JsonProcessingException {
 			gen.writeString(asJson(instant));			
 		}
-	}
+	}*/
 }

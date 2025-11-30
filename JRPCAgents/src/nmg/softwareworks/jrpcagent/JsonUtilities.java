@@ -83,7 +83,7 @@ public class JsonUtilities {
 		var mapper = JsonMapper.builder(mjfactory) .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 				.defaultAttributes(defaultDsAtts) //.constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
 				.build();
-		//JsonTimeUtilities.isoSerialization(mapper);
+		JsonTimeUtilities.isoSerialization(mapper);
 		//mapper.registerModule(JRPCRules);
 		return mapper;
 	}

@@ -15,6 +15,7 @@ class JRPCReader  extends InputStreamReader{
 		try {
 			deserializationTarget = instanceForResult;
 			var mapper = new ObjectMapper();
+			JsonTimeUtilities.isoSerialization(mapper);
 			return mapper.readerForUpdating(instanceForResult).readValue(jParser);
 		}finally {deserializationTarget = oldTarget;}
 	}
