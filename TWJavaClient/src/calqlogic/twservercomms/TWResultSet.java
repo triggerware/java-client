@@ -64,7 +64,7 @@ public class TWResultSet<T> implements  AutoCloseable{
 	 * In the case of an FOL query, there is still a signature but I do not know where the types come from.
 	 */
 	private final SignatureElement[]signature;
-	private final String[]columnNames;
+	private final String[]columnNames, columnTypes;
 
 	private boolean closed = false; // closed means that no more requests involving this resultset are permissible
 	private boolean exhausted; // exhausted means that the TW server will not supply any further rows
@@ -102,9 +102,12 @@ public class TWResultSet<T> implements  AutoCloseable{
 		this.signature = signature;//eqResult.getSignature();
 		if (signature != null) {
 			columnNames = new String[signature.length];
-			for (int i=0; i<columnNames.length; i++)
+			columnTypes = new String[signature.length];
+			for (int i=0; i<columnNames.length; i++) {
 				columnNames[i] = signature[i].name;
-		} else columnNames = null;
+				columnTypes[i] = signature[i].typeName;
+			}
+		} else columnNames = columnTypes = null;
 	}
 
 	/**
@@ -128,6 +131,8 @@ public class TWResultSet<T> implements  AutoCloseable{
 	 * @return the names of the columns for the columns of this resultset
 	 */
 	public String[] getColumnNames() {return columnNames;}
+	
+	public String[] getColumnTypeNames(){return columnTypes;}
 	
 	/**
 	 * @return the statement used to create this TWResultSet

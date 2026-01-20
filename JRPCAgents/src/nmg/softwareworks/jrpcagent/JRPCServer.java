@@ -2,6 +2,7 @@ package nmg.softwareworks.jrpcagent;
 
 import java.io.*;
 import java.net.ServerSocket;
+import java.net.Socket;
 //import java.net.Socket;
 import java.net.SocketException;
 import java.util.Collections;
@@ -33,7 +34,7 @@ public abstract class JRPCServer extends HandlerRegistration {
 	 * @return the port on which this server listens
 	 */
 	public int getPort() {return serverSocket.getLocalPort();}
-	
+	public ServerSocket getSocket() {return serverSocket;}
 	public String getName() {return name;}
 	
 	/**
@@ -60,11 +61,10 @@ public abstract class JRPCServer extends HandlerRegistration {
 		var thread = new Thread() {//this should be a virtual thread for java21+
 			public void run() {
 					while (true) {
-						//Socket socket = null;
+						Socket clientSocket = null;
 						synchronized (acceptLock) {
 							try {
-								//socket = 
-								serverSocket.accept();
+								clientSocket = serverSocket.accept();
 							}catch(SocketException ie) {
 								return;
 							}catch (IOException e) {
@@ -72,11 +72,7 @@ public abstract class JRPCServer extends HandlerRegistration {
 								break;
 							}
 						}
-						try {
-							myClients.add(agent);
-						}catch (Throwable t) {
-							Logging.log(t, String.format("JRPCServer <%s>failed to create a new ServerAgent", name));
-						}
+						if (agent!=null) myClients.add(agent);
 					}
 			}	
 		};
@@ -98,5 +94,9 @@ public abstract class JRPCServer extends HandlerRegistration {
 	 * performs a shutdown of each of the existing clients of this JRPCServer
 	 */
 	protected void shutdownAllClients() {
-		myClients.forEach((sa -> {sa.close();}));}
+		myClients.forEach(sa -> {
+			try {sa.close();
+			} catch (Throwable t) {}
+		});
+		}
 }

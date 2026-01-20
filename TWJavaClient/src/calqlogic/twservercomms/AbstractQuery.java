@@ -107,8 +107,7 @@ public abstract class AbstractQuery<T> implements Cloneable, Closeable{
 	}
 
 	@JsonFormat(shape=JsonFormat.Shape.OBJECT)
-	public
-	static class SignatureElement{
+	public static class SignatureElement{
 		final String name;
 		final String typeName;
 		@JsonIgnore

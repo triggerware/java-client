@@ -137,9 +137,13 @@ public abstract class ScheduledQuery<T> extends PolledQuery<T> {
 	}*/
 
 	/**
-	* deactivate is a synonym for close, but is synchronized.
-	* There is no means to quit polling the ScheduledQuery according to its schedule, yet <em>retain</em> the option of
-	* doing future on-demand polling of the query.
-	*/
-	/*public synchronized void deactivate() {super.close();}*/
+	 * @return true if this query has been activated and not yet closed -- i.e., if the query is still being sampled on its schedule
+	 */
+	public boolean isActive() {return active;}
+	@Override
+	public void close() {
+		super.close();
+		active = false;
+	}
+
 }

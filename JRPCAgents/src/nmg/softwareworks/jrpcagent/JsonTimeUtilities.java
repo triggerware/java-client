@@ -1,13 +1,13 @@
 package nmg.softwareworks.jrpcagent;
 
-import java.io.IOException;
+//import java.io.IOException;
 import java.time.*;
 import java.time.format.DateTimeParseException;
 
-import com.fasterxml.jackson.core.*;
+//import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
+//import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
@@ -39,7 +39,7 @@ public class JsonTimeUtilities {
 	 */
 	public static LocalDate dateFromJson(String jsdate) {
 		try {
-			return LocalDate.parse(jsdate);//LocalDate.parse(jdate, dateFormat);
+			return LocalDate.parse(jsdate);
 		} catch (DateTimeParseException e) {
 			return null;}
 	}
@@ -111,10 +111,9 @@ public class JsonTimeUtilities {
 		om.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 	}
 	
-	public interface CustomDeserializer{
-	    public Object parse(JsonParser parser) throws IOException;}
+	/*public interface CustomDeserializer{ public Object parse(JsonParser parser) throws IOException;}
 	
-	/*private static final class JsonInstantDeserializer extends JsonDeserializer<Instant>{
+	private static final class JsonInstantDeserializer extends JsonDeserializer<Instant>{
 		@Override
 		public Instant deserialize(JsonParser parser, DeserializationContext arg1)
 				throws IOException, JsonProcessingException {

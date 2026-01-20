@@ -35,9 +35,11 @@ class PolledQueryNotification <T> extends Notification{
 		Instant ts = timestampAsInstant();
 		try {
 			if (errorText!=null) pq.handleError(errorText, ts);
-			else {	pq.handleSuccess(delta, ts);
-				    pq.hasSucceeded = true;
-				 }
+			else {
+				//Logging.log("handling polled query notification");
+				pq.handleSuccess(delta, ts);
+			    pq.hasSucceeded = true;
+			 }
 		}catch(Throwable t) {
 			Logging.log(t, String.format("error thrown from polled query notification handler for %s" , notificationTag));
 		} 
