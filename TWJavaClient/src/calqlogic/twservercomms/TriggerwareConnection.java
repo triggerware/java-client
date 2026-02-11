@@ -6,6 +6,11 @@ import java.util.HashSet;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import nmg.softwareworks.jrpcagent.Connection;
 
+/**
+ * a connection to a Triggerware server.  All requests are sent on a TriggerwareConnection.
+ * Responses and notifications are received on a TriggerwareConnection.
+ * Closing a TriggerwareConnection will release all resources on its  Triggerware server that are associated with the connection.
+ */
 public class TriggerwareConnection extends Connection{
 
 	private String defaultSchema = null;
@@ -48,6 +53,9 @@ public class TriggerwareConnection extends Connection{
 		this.getPartnerMapper().registerModule(sm);
 	}
 
+	/**
+	 * @return the client using this connection
+	 */
 	public TriggerwareClient getClient() {return twClient;}
 
 	@Override

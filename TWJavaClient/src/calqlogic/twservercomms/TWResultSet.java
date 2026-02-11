@@ -208,7 +208,6 @@ public class TWResultSet<T> implements  AutoCloseable{
 	 * @return <code>true</code> if any more rows remain, otherwise <code>false</code>
 	 * When a row is available, it is made the current row and can be obtained via {@link #get()}
 	 * @throws TWResultSetException if this TWResultSet has been closed and the cache is empty
-	 * @throws TimeoutException if more rows need to be obtained from the TW server and the request times out
 	 */
 	synchronized public boolean next() throws TWResultSetException {
 		//if (closed) throw closedResultSetException;
@@ -285,6 +284,12 @@ public class TWResultSet<T> implements  AutoCloseable{
 			this.rowConstructor = rowConstructor;
 			this.sig = sig;
 		}
+		/**
+		 * establishResponseDeserializationAttributes is used internally to establish context used to deserialize JRPC messages. It is not intended to be overridden or called in application code.
+		 * @param request
+		 * @param response
+		 * @param ctxt
+		 */
 		@Override
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
 			@SuppressWarnings("unchecked")

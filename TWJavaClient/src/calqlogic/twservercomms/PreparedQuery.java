@@ -202,6 +202,12 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 			this.rowSignature = rowSignature;
 		}
 		Constructor<T> getRowConstructor(){return rowConstructor;}
+		/**
+		 * establishResponseDeserializationAttributes is used internally to establish context used to deserialize JRPC messages. It is not intended to be overridden or called in application code.
+		 * @param request
+		 * @param response
+		 * @param ctxt
+		 */
 		@Override
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
 			@SuppressWarnings("unchecked")
@@ -225,6 +231,12 @@ public class PreparedQuery<T> extends AbstractQuery<T> implements Statement{
 		}
 		Constructor<T> getRowConstructor(){return rowConstructor;}
 
+		/**
+		 * establishResponseDeserializationAttributes is used internally to establish context used to deserialize JRPC messages. It is not intended to be overridden or called in application code.
+		 * @param request
+		 * @param response
+		 * @param ctxt
+		 */
 		@Override // in the case of rows sent by notification, this method is called during deserialization of the notification, not during deserialization of the request's response
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
 			if (rowConstructor != null) {

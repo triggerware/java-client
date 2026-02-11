@@ -420,8 +420,6 @@ public abstract class PolledQuery<T> extends AbstractQuery<T> {
 	 *close is a noop for a PolledQuery that is already closed or one
 	 *that has never been registered.  A PolledQuery is implicitly unregistered if the query's connection is closed.
 	 *</p>
-	 *@return true if the query was successfully closed.  false if it was already closed or if the server was unable to confirm
-	 *closing it.
 	 */
 	@Override
 	public synchronized void close() {

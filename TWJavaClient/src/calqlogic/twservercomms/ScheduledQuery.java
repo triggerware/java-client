@@ -41,7 +41,7 @@ public abstract class ScheduledQuery<T> extends PolledQuery<T> {
 			PolledQueryControlParameters controls) throws JRPCException{
 		this(client.getPrimaryConnection(), rowClass,  query, language, schema, schedule, controls, null);	}
 	
-	/*
+	/**
 	 * create a ScheduledQuery and register it to report changes on a connection.
 	 * other constructors for ScheduledQuery simply provide default values for some of the paramters of this one
 	 * @param connection  the connection on which the changes will be reported
@@ -53,7 +53,7 @@ public abstract class ScheduledQuery<T> extends PolledQuery<T> {
 	 * @param controls the control parameters to used for polling and reporting.
 	 * @throws JRPCException if registration on the connection fails
 	 */
-	protected ScheduledQuery(TriggerwareConnection connection, Class<T>rowClass,  	String query, String language, String schema,
+	ScheduledQuery(TriggerwareConnection connection, Class<T>rowClass, String query, String language, String schema,
 			PolledQuerySchedule schedule, PolledQueryControlParameters controls, Double clockFactor) throws JRPCException{
 		super(connection, rowClass, query, language, schema, controls);
 		

@@ -326,8 +326,8 @@ public class TriggerwareClient extends JRPCAgent{
 
 	static NamedParameterRequest<String> deletePolledQueryRequest = 
 			new NamedParameterRequest<String>(String.class,  "delete-polled-query", null,  null);
-	public String deletePolledQuery (NamedRequestParameters parms) throws JRPCException {
-		return deletePolledQueryRequest.execute(primaryConnection, parms);	}
+	//public String deletePolledQuery (NamedRequestParameters parms) throws JRPCException {
+	//	return deletePolledQueryRequest.execute(primaryConnection, parms);	}
 
 	
 	/**

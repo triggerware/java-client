@@ -47,7 +47,13 @@ public class QueryStatement implements Statement{
 		this.fetchSize = ((TriggerwareClient)(connection.getAgent())).getDefaultFetchSize();
 	}
 	
-	public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {}
+	/**
+	 * establishResponseDeserializationAttributes is used internally to establish context used to deserialize JRPC messages. It is not intended to be overridden or called in application code.
+	 * @param request
+	 * @param response
+	 * @param ctxt
+	 */
+	protected void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {}
 
 	/** 
 	 * set the fetchSize  for executions of this QueryStatement.  The fetch size is the number of results to return in
@@ -227,6 +233,12 @@ optional:
 			rowConstructor = (Constructor<T>) AbstractQuery.getRowConstructor(rowClass);
 		}
 		//Constructor<T> getRowConstructor(){return rowConstructor;}
+		/**
+		 * establishResponseDeserializationAttributes is used internally to establish context used to deserialize JRPC messages. It is not intended to be overridden or called in application code.
+		 * @param request
+		 * @param response
+		 * @param ctxt
+		 */
 		@Override
 		public void establishResponseDeserializationAttributes(JRPCSimpleRequest<?> request, IncomingMessage response, DeserializationContext ctxt) {
 			QueryStatement.this.establishResponseDeserializationAttributes(request,  response,  ctxt);
