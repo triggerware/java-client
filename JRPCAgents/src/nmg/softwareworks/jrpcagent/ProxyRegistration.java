@@ -6,14 +6,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import nmg.softwareworks.jrpcagent.annotations.JsonRpcProxy;
-final class ProxyRegistration extends Handler_Proxy_Registration{
+final class ProxyRegistration{
 	
 	
 	private static void validateProxyMethod(Method m) throws Exception {
 		/*var paramCount = m.getParameterCount();
 		if (paramCount>1)
 			throw new Exception("A JRPC Server request handler may have at most one parameter");*/
-		if ( publicOnlyReflection && !Modifier.isPublic(m.getModifiers())) 
+		if (HandlerProxyRegistration.publicOnlyReflection && !Modifier.isPublic(m.getModifiers())) 
 		   //private methods can be executed by reflection, but if there is a security manager they must be executed
 		   //as a PrivilegedAction
 			throw new Exception("A JRPC request handler method must be a public method when a Java Security Manager is used");

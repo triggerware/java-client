@@ -412,7 +412,7 @@ public class Connection implements Closeable{
 		return internalErrorCode;
 	}
 	private void executeRequest (IncomingMessage msg, RegisteredHandler rh) throws IOException {
-		if (rh.synchronous) executeRequestInternal(msg,rh);
+		if (rh.synchronous) executeRequestInternal(msg, rh);
 		/*else if (rh.useVirtualThread) {
 			Thread thread = Thread.ofVirtual().start(() -> {// same as body of run below
 			});
@@ -422,7 +422,7 @@ public class Connection implements Closeable{
 				@Override
 				public void run() {
 					try {
-						executeRequestInternal(msg,rh);
+						executeRequestInternal(msg, rh);
 					} catch (IOException e) {
 						 try{
 							 streamErrorResponse(msg, getExceptionErrorCode(e, agent.getRequestSignature(msg.methodName)), e,

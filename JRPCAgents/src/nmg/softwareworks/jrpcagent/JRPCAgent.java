@@ -2,6 +2,7 @@ package nmg.softwareworks.jrpcagent;
 
 import java.io.*;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -487,15 +488,28 @@ public abstract class JRPCAgent extends HandlerRegistration implements Closeable
 		var st = art.getAnnotation(nmg.softwareworks.jrpcagent.annotations.SerializationType.class);
 		st = st;
 	}*/
-	/*public static void main(String[] args) {
-		//var xxx = activeBatch.get();
-		var future = new CompletableFuture<Integer>();
-		try {future.get(3,TimeUnit.SECONDS);
+	private static class TestServer extends JRPCServer{
 		
-		}catch(java.util.concurrent.TimeoutException to) {
-			to = new java.util.concurrent.TimeoutException("client timeout  waiting for");
-			to = to;
-		}catch (Throwable t) {
-			t = t;}
-	}*/
+		private static class TestServerClient extends ServerAgent{
+			public TestServerClient(JRPCServer server, Socket socket) throws IOException{
+				super(server, socket, "client of TestServer");
+			}
+		}
+
+		protected TestServer(String name, ServerSocket serverSocket) {
+			super(name, serverSocket);
+			// TODO Auto-generated constructor stub
+		}
+
+		@Override
+		protected ServerAgent newClient(Socket clientSocket) throws IOException {
+			return new TestServerClient(this, clientSocket);
+		}
+		
+	}
+	public static void main(String[] args) throws Exception {
+		var port = Integer.parseInt(args[0]);
+		var server = new TestServer("test server",new ServerSocket(port));
+		server.start(false);
+	}
 }

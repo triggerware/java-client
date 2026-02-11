@@ -30,12 +30,19 @@ public abstract class JRPCServer extends HandlerRegistration {
 		this.serverSocket = serverSocket;
 	}
 	
+	abstract protected ServerAgent newClient(Socket clientSocket) throws IOException;
+	
 	/**
 	 * @return the port on which this server listens
 	 */
 	public int getPort() {return serverSocket.getLocalPort();}
 	public ServerSocket getSocket() {return serverSocket;}
 	public String getName() {return name;}
+	public ServerAgent clientForConnection(Connection conn) {
+		for (var client : myClients) {
+			if (client.getConnection() == conn) return client;}
+		return null;
+	}
 	
 	/**
 	 * An JRPC Server implementation should override this method in order to use a subclass of ServerAgent for the agents
@@ -51,30 +58,35 @@ public abstract class JRPCServer extends HandlerRegistration {
 	/**
 	 * Override onNewNetworkClient to execute your own event handler when a new connection is made to this server.
 	 */
-	public void onNewNetworkClient(ServerAgent agent) {}
+	//public void onNewNetworkClient(ServerAgent agent) {}
 	private Lock acceptLock = new ReentrantLock();
 	public void blockFurtherConnections(boolean b) {
 		if (b) acceptLock.lock(); else acceptLock.unlock();
 	};
 	
-	public Thread start(boolean asDeamon, ServerAgent agent) throws IOException {
+	public Thread start(boolean asDeamon /*, ServerAgent agent*/) throws IOException {
 		var thread = new Thread() {//this should be a virtual thread for java21+
 			public void run() {
-					while (true) {
-						Socket clientSocket = null;
-						synchronized (acceptLock) {
-							try {
-								clientSocket = serverSocket.accept();
-							}catch(SocketException ie) {
-								return;
-							}catch (IOException e) {
-								Logging.getLogger().log(e, "ServerSocket accept failure");
-								break;
-							}
+				while (true) {
+					Socket clientSocket = null;
+					synchronized (acceptLock) {
+						try {
+							clientSocket = serverSocket.accept();
+						}catch(SocketException ie) {
+							return;
+						}catch (IOException e) {
+							Logging.getLogger().log(e, "ServerSocket accept failure");
+							break;
 						}
-						if (agent!=null) myClients.add(agent);
 					}
-			}	
+					//if (agent!=null) myClients.add(agent);
+					try {
+						var agent = newClient(clientSocket);
+						myClients.add(agent);
+					} catch(IOException e) {
+						e = e;}
+				};
+			};
 		};
 		if (asDeamon) 
 			thread.setDaemon(true);

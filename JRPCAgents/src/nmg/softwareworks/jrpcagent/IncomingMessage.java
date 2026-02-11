@@ -297,11 +297,13 @@ public class IncomingMessage implements IncomingJRPCMessage{
 								firstId = false;
 								conn.handleUnexpected(message, propertyName);
 							}
-							if (firstId ) {
+							if (firstId && message.methodName == null) {//could be response or request
 								JRPCSimpleRequest<?> req = conn.pendingRequest(message.id);
-								message.request = req;
-								req.establishResponseDeserializationAttributes(message, ctxt);
-								//conn.getSerializationState().setStateForParsing(req);
+								if (req != null) { //a response
+									message.request = req;
+									req.establishResponseDeserializationAttributes(message, ctxt);
+									//conn.getSerializationState().setStateForParsing(req);
+								}
 							}
 						}
 					case "result" ->{ // should only occur on a response

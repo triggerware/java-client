@@ -12,7 +12,7 @@ import nmg.softwareworks.jrpcagent.annotations.JsonRpcHandler;
  * this class manages the registration of request handlers for JRPC agents
  *
  */
-abstract public class HandlerRegistration extends Handler_Proxy_Registration {
+abstract public class HandlerRegistration {
 	
 	static class RegisteredHandler{
 		final Method method;
@@ -46,7 +46,7 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 		var firstType = m.getParameterTypes()[0];
 		if (!Connection.class.isAssignableFrom(firstType))
 			throw new Exception("the first parameter of a request handling method must be ServerConnection or a subclass thereof");
-		if (publicOnlyReflection && !Modifier.isPublic(m.getModifiers())) 
+		if (HandlerProxyRegistration.publicOnlyReflection && !Modifier.isPublic(m.getModifiers())) 
 		   //private methods can be executed by reflection, but if there is a security manager they must be executed
 		   //as a PrivilegedAction
 			throw new Exception("A JRPC Agent request handler must be a public method when a Java Security Manager is used");
@@ -90,7 +90,7 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 	
 	public void registerRequestHandler(String methodName, RequestSignature sig, Method m, boolean synchronous, boolean useVirtualThread, //ignored, not using virutal threads
 			Object instance, String resultSerializationContext) throws Exception {
-		if (methodName == null || methodName.isEmpty())
+		if (methodName == null || methodName.isBlank())
 			throw new Exception(String.format("registerRequestHandler: invalid method name [%s]",methodName));
 		registerRequestHandler(methodName, m, synchronous, instance);
 		registerRequestSignature(methodName, sig);
@@ -137,7 +137,7 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 	 * Note: this implementation currently does NOT register handlers if the annotation is placed on
 	 * a DEFAULT method of an interface and none of the classes override the default!
 	 */
-	public <T>void registerHandlers(Class<T>klass) {registerHandlers(klass,null);}
+	//public <T>void registerHandlers(Class<T>klass) {registerHandlers(klass, this);}
 	/**
 	 * registerHandlers registers methods/signature for request handlers of a class, its superclasses,
 	 * and its interfaces.
@@ -152,11 +152,12 @@ abstract public class HandlerRegistration extends Handler_Proxy_Registration {
 	 * Note: this implementation currently does NOT register handlers if the annotation is placed on
 	 * a DEFAULT method of an interface and none of the classes override the default!
 	 */
-	public <T>void registerHandlers(Class<T>klass, T instance) {
+	@SuppressWarnings("unchecked")
+	public <T extends JRPCServer>void registerHandlers(Class<T>klass, JRPCServer instance) {
 		var superClass = klass.getSuperclass();
 		var interfaces = klass.getInterfaces();
 		if (HandlerRegistration.class.isAssignableFrom(superClass)  && superClass != HandlerRegistration.class) 
-			registerHandlers((Class<? super T>)superClass, instance);
+			registerHandlers((Class<? extends JRPCServer>)superClass, instance);
 		for (var method : klass.getDeclaredMethods()) {
 			registerHandlersViaInterface(method, interfaces, instance);
 			var jh = method.getAnnotation(JsonRpcHandler.class);

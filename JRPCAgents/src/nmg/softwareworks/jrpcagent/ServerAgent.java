@@ -33,8 +33,10 @@ public abstract class ServerAgent extends JRPCAgent{
 		super(socket, name);
 		this.server = server;
 		this.index = server.nextConnectionIndex();
-		server.onNewNetworkClient(this);
+		//server.onNewNetworkClient(this);
 	}
+	
+	public Connection getConnection() {return super.getPrimaryConnection();}
 	
 	/**
 	 * @return the JRPCServer that created this agent
